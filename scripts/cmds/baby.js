@@ -1,443 +1,237 @@
-const axios = require("axios");
-
-const API = axios.create({
-  baseURL: "https://eryxenx.agi.bd/api/simsimi",
-  timeout: 20000
-});
-
-const triggerLocks = new Set();
-
-function errMsg(e) {
-  const d = e && e.response && e.response.data;
-  return (d && (d.message || d.error || d.detail)) || (e && e.message) || "Unknown error";
-}
-
-async function sendTypingIndicatorV2(api, sendTyping, threadID) {
-  try {
-    if (typeof api.sendTypingIndicator === "function") {
-      await api.sendTypingIndicator(threadID, sendTyping);
-    }
-  } catch (err) {
-    console.log("⚠️ Typing indicator error:", err.message);
-  }
-}
-
-let botUID = null;
-function getBotUID(api) {
-  if (botUID) return botUID;
-  try {
-    if (typeof api.getCurrentUserID === "function") {
-      botUID = api.getCurrentUserID();
-    }
-  } catch {}
-  return botUID;
-}
+const axios = require('axios');
+const baseApiUrl = async () => {
+    return "https://noobs-api.top/dipto";
+};
 
 module.exports.config = {
-  name: "baby",
-  version: "8.0.0",
-  role: 0,
-  author: "EryXenX",
-  countTime: 0,
-  category: "chat",
-  shortDescription: "AI auto teach chat (Simsimi-style)",
-  longDescription: "AI auto teach with Teach & List support + Typing effect",
-  guide: "{pn} [query]\n{pn} list\n{pn} teach [Question] - [Reply]\n{pn} react [Question] - [Emoji]\n{pn} edit [Question] - [OldReply] - [NewReply]\n{pn} remove/rm [Question] - [Reply]\n{pn} del (reply to bot's wrong answer)\n{pn} msg [trigger]\n{pn} msg [trigger] -20 (custom show limit)",
-  envConfig: {}
+    name: "baby",
+    aliases: ["baby", "bbe", "babe"," bot chan"],
+    version: "6.9.0",
+    author: "dipto edit by MAMUN ",
+    countDown: 0,
+    role: 0,
+    description: "better then all sim simi",
+    category: "chat",
+    guide: {
+        en: "{pn} [anyMessage] OR\nteach [YourMessage] - [Reply1], [Reply2], [Reply3]... OR\nteach [react] [YourMessage] - [react1], [react2], [react3]... OR\nremove [YourMessage] OR\nrm [YourMessage] - [indexNumber] OR\nmsg [YourMessage] OR\nlist OR \nall OR\nedit [YourMessage] - [NeeMessage]"
+    }
 };
 
-async function getUserName(api, uid, usersData) {
-  try {
-    if (usersData && typeof usersData.getName === "function") {
-      const name = await usersData.getName(uid);
-      if (name) return name;
-    }
-    const info = await api.getUserInfo(uid);
-    return (info && info[uid] && info[uid].name) || "User";
-  } catch {
-    return "User";
-  }
-}
+module.exports.onStart = async ({
+    api,
+    event,
+    args,
+    usersData
+}) => {
+    const link = `${await baseApiUrl()}/baby`;
+    const dipto = args.join(" ").toLowerCase();
+    const uid = event.senderID;
+    let command, comd, final;
 
-module.exports.onStart = async function ({ api, event, args, usersData }) {
-  const uid = event.senderID;
-  const senderName = await getUserName(api, uid, usersData);
-  const query = args.join(" ").toLowerCase();
-
-  try {
-    if (args[0] === "autoteach") {
-      const res = await API.get("/autoteach/stats");
-      const { today = 0, total = 0 } = res.data || {};
-      return api.sendMessage(
-        `╭─╼🌟 𝗔𝘂𝘁𝗼𝘁𝗲𝗮𝗰𝗵 𝗦𝘁𝗮𝘁𝘂𝘀\n├ 🟢 𝗦𝘁𝗮𝘁𝘂𝘀: 𝗔𝗹𝘄𝗮𝘆𝘀 𝗢𝗡\n├ 📅 𝗧𝗼𝗱𝗮𝘆: ${today}\n╰─╼📊 𝗧𝗼𝘁𝗮𝗹: ${total}`,
-        event.threadID,
-        event.messageID
-      );
-    }
-
-    if (args[0] === "list") {
-      const res = await API.get("/list");
-      return api.sendMessage(
-        `╭─╼🌟 𝗕𝗮𝗯𝘆 𝗔𝗜 𝗦𝘁𝗮𝘁𝘂𝘀\n├ 📝 𝗧𝗲𝗮𝗰𝗵𝗲𝗱 𝗤𝘂𝗲𝘀𝘁𝗶𝗼𝗻𝘀: ${res.data.totalQuestions}\n├ 📦 𝗦𝘁𝗼𝗿𝗲𝗱 𝗥𝗲𝗽𝗹𝗶𝗲𝘀: ${res.data.totalReplies}\n╰─╼👤 𝗗𝗲𝘃𝗲𝗹𝗼𝗽𝗲𝗿: 𝗘𝗿𝘆𝗫𝗲𝗻𝗫`,
-        event.threadID,
-        event.messageID
-      );
-    }
-
-    if (args[0] === "msg") {
-      let trigger = args.slice(1).join(" ").trim();
-      if (!trigger) return api.sendMessage("❌ | Use: !baby msg [trigger]\nOr: !baby msg [trigger] -20 (custom limit)", event.threadID, event.messageID);
-
-      let customLimit = null;
-      const limitMatch = trigger.match(/\s*-(\d+)\s*$/);
-      if (limitMatch) {
-        customLimit = parseInt(limitMatch[1], 10);
-        trigger = trigger.replace(/\s*-(\d+)\s*$/, "").trim();
-        if (!trigger) return api.sendMessage("❌ | Use: !baby msg [trigger] -20", event.threadID, event.messageID);
-      }
-
-      const res = await API.get("/simsimi-list", { params: { ask: trigger } });
-      if (!res.data.replies || res.data.replies.length === 0)
-        return api.sendMessage("❌ No replies found.", event.threadID, event.messageID);
-
-      const REPLY_LIMIT = (customLimit && customLimit > 0) ? customLimit : 150;
-      const allReplies = res.data.replies;
-      const shownReplies = allReplies.slice(0, REPLY_LIMIT);
-      const remaining = allReplies.length - shownReplies.length;
-
-      const formatted = shownReplies.map((rep, i) => `➤ ${i + 1}. ${rep}`).join("\n");
-      const limitNote = remaining > 0
-        ? `\n⚠️ ${REPLY_LIMIT} 𝘁𝗮 𝗿𝗲𝗽𝗹𝘆 𝗱𝗲𝗸𝗵𝗮𝗻𝗼 𝗵𝗼𝘆𝗲𝗰𝗵𝗲, 𝗮𝗿𝗼 ${remaining} 𝘁𝗮 𝗯𝗮𝗸𝗶 𝗮𝗰𝗵𝗲 (𝗱𝗲𝗸𝗵𝗮𝗻𝗼 𝗷𝗮𝗰𝗰𝗵𝗲 𝗻𝗮, 𝘁𝗮𝗯𝗲 𝗸𝗶𝗽 𝘀𝗵𝘂𝗯𝗵 𝗿𝗲𝗽𝗹𝗶𝗿 𝘂𝗽𝗼𝗿 𝗸𝗮𝗷 𝗸𝗼𝗿𝗯𝗲)।\n`
-        : "";
-      const msg = `📌 𝗧𝗿𝗶𝗴𝗴𝗲𝗿: ${trigger.toUpperCase()}\n📋 𝗧𝗼𝘁𝗮𝗹: ${res.data.total}\n━━━━━━━━━━━━━━\n${formatted}\n━━━━━━━━━━━━━━${limitNote}✏️ Reply with the numbers you want to KEEP (e.g. "2, 7") — everything else will be removed.`;
-
-      return api.sendMessage(msg, event.threadID, (err, info) => {
-        if (!err) {
-          global.GoatBot.onReply.set(info.messageID, {
-            commandName: module.exports.config.name,
-            messageID: info.messageID,
-            author: event.senderID,
-            type: "msgSelect",
-            trigger
-          });
+    try {
+        if (!args[0]) {
+            const ran = ["Bolo baby", "hum", "type help baby", "type #baby hi"];
+            return api.sendMessage(ran[Math.floor(Math.random() * ran.length)], event.threadID, event.messageID);
         }
-      }, event.messageID);
+
+        if (args[0] === 'remove') {
+            const fina = dipto.replace("remove ", "");
+            const dat = (await axios.get(`${link}?remove=${fina}&senderID=${uid}`)).data.message;
+            return api.sendMessage(dat, event.threadID, event.messageID);
+        }
+
+        if (args[0] === 'rm' && dipto.includes('-')) {
+            const [fi, f] = dipto.replace("rm ", "").split(/\s*-\s*/);
+            const da = (await axios.get(`${link}?remove=${fi}&index=${f}`)).data.message;
+            return api.sendMessage(da, event.threadID, event.messageID);
+        }
+
+        if (args[0] === 'list') {
+            if (args[1] === 'all') {
+                const data = (await axios.get(`${link}?list=all`)).data;
+                const limit = parseInt(args[2]) || 100;
+                const limited = data?.teacher?.teacherList?.slice(0, limit)
+                const teachers = await Promise.all(limited.map(async (item) => {
+                    const number = Object.keys(item)[0];
+                    const value = item[number];
+                    const name = await usersData.getName(number).catch(() => number) || "Not found";
+                    return {
+                        name,
+                        value
+                    };
+                }));
+                teachers.sort((a, b) => b.value - a.value);
+                const output = teachers.map((t, i) => `${i + 1}/ ${t.name}: ${t.value}`).join('\n');
+                return api.sendMessage(`Total Teach = ${data.length}\n👑 | List of Teachers of baby\n${output}`, event.threadID, event.messageID);
+            } else {
+                const d = (await axios.get(`${link}?list=all`)).data;
+                return api.sendMessage(`❇️ | Total Teach = ${d.length || "api off"}\n♻️ | Total Response = ${d.responseLength || "api off"}`, event.threadID, event.messageID);
+            }
+        }
+
+        if (args[0] === 'msg') {
+            const fuk = dipto.replace("msg ", "");
+            const d = (await axios.get(`${link}?list=${fuk}`)).data.data;
+            return api.sendMessage(`Message ${fuk} = ${d}`, event.threadID, event.messageID);
+        }
+
+        if (args[0] === 'edit') {
+            const command = dipto.split(/\s*-\s*/)[1];
+            if (command.length < 2) return api.sendMessage('❌ | Invalid format! Use edit [YourMessage] - [NewReply]', event.threadID, event.messageID);
+            const dA = (await axios.get(`${link}?edit=${args[1]}&replace=${command}&senderID=${uid}`)).data.message;
+            return api.sendMessage(`changed ${dA}`, event.threadID, event.messageID);
+        }
+
+        if (args[0] === 'teach' && args[1] !== 'amar' && args[1] !== 'react') {
+            [comd, command] = dipto.split(/\s*-\s*/);
+            final = comd.replace("teach ", "");
+            if (command.length < 2) return api.sendMessage('❌ | Invalid format!', event.threadID, event.messageID);
+            const re = await axios.get(`${link}?teach=${final}&reply=${command}&senderID=${uid}&threadID=${event.threadID}`);
+            const tex = re.data.message;
+            const teacher = (await usersData.get(re.data.teacher)).name;
+            return api.sendMessage(`✅ Replies added ${tex}\nTeacher: ${teacher}\nTeachs: ${re.data.teachs}`, event.threadID, event.messageID);
+        }
+
+        if (args[0] === 'teach' && args[1] === 'amar') {
+            [comd, command] = dipto.split(/\s*-\s*/);
+            final = comd.replace("teach ", "");
+            if (command.length < 2) return api.sendMessage('❌ | Invalid format!', event.threadID, event.messageID);
+            const tex = (await axios.get(`${link}?teach=${final}&senderID=${uid}&reply=${command}&key=intro`)).data.message;
+            return api.sendMessage(`✅ Replies added ${tex}`, event.threadID, event.messageID);
+        }
+
+        if (args[0] === 'teach' && args[1] === 'react') {
+            [comd, command] = dipto.split(/\s*-\s*/);
+            final = comd.replace("teach react ", "");
+            if (command.length < 2) return api.sendMessage('❌ | Invalid format!', event.threadID, event.messageID);
+            const tex = (await axios.get(`${link}?teach=${final}&react=${command}`)).data.message;
+            return api.sendMessage(`✅ Replies added ${tex}`, event.threadID, event.messageID);
+        }
+
+        if (dipto.includes('amar name ki') || dipto.includes('amr nam ki') || dipto.includes('amar nam ki') || dipto.includes('amr name ki') || dipto.includes('whats my name')) {
+            const data = (await axios.get(`${link}?text=amar name ki&senderID=${uid}&key=intro`)).data.reply;
+            return api.sendMessage(data, event.threadID, event.messageID);
+        }
+
+        const d = (await axios.get(`${link}?text=${dipto}&senderID=${uid}&font=1`)).data.reply;
+        api.sendMessage(d, event.threadID, (error, info) => {
+            global.GoatBot.onReply.set(info.messageID, {
+                commandName: this.config.name,
+                type: "reply",
+                messageID: info.messageID,
+                author: event.senderID,
+                d,
+                apiUrl: link
+            });
+        }, event.messageID);
+
+    } catch (e) {
+        console.log(e);
+        api.sendMessage("Check console for error", event.threadID, event.messageID);
     }
-
-    if (args[0] === "teach") {
-      const parts = query.replace("teach ", "").split(" - ");
-      if (parts.length < 2)
-        return api.sendMessage("❌ | Use: teach [Question] - [Reply]", event.threadID, event.messageID);
-
-      const [ask, ans] = parts;
-      const res = await API.get("/teach", { params: { ask, ans, senderID: uid, senderName } });
-      return api.sendMessage(`✅ ${res.data.message}`, event.threadID, event.messageID);
-    }
-
-    if (args[0] === "react") {
-      const rawQuery = args.slice(1).join(" ");
-      const parts = rawQuery.split(" - ");
-      if (parts.length < 2)
-        return api.sendMessage("❌ | Use: react [Question] - [Emoji]", event.threadID, event.messageID);
-
-      const [ask, emoji] = parts;
-      if (!ask.trim() || !emoji.trim())
-        return api.sendMessage("❌ | Use: react [Question] - [Emoji]", event.threadID, event.messageID);
-
-      const res = await API.get("/teachReact", { params: { ask, emoji, senderName } });
-      return api.sendMessage(`✅ ${res.data.message}`, event.threadID, event.messageID);
-    }
-
-    if (args[0] === "edit") {
-      const parts = query.replace("edit ", "").split(" - ");
-      if (parts.length < 3)
-        return api.sendMessage("❌ | Use: edit [Question] - [OldReply] - [NewReply]", event.threadID, event.messageID);
-
-      const [ask, oldR, newR] = parts;
-      const res = await API.get("/edit", { params: { ask, old: oldR, new: newR } });
-      return api.sendMessage(res.data.message, event.threadID, event.messageID);
-    }
-
-    if (["remove", "rm"].includes(args[0])) {
-      const parts = query.replace(/^(remove|rm)\s*/, "").split(" - ");
-      if (parts.length < 2)
-        return api.sendMessage("❌ | Use: remove [Question] - [Reply]", event.threadID, event.messageID);
-
-      const [ask, ans] = parts;
-      const res = await API.get("/delete", { params: { ask, ans } });
-      return api.sendMessage(res.data.message, event.threadID, event.messageID);
-    }
-
-    if (args[0] === "del") {
-      return api.sendMessage(
-        "❌ | Reply to the bot's wrong answer message with \"!baby del\" to delete it.",
-        event.threadID,
-        event.messageID
-      );
-    }
-
-    if (!query) {
-      const texts = ["Hey baby 💖", "Yes, I'm here 😘"];
-      const reply = texts[Math.floor(Math.random() * texts.length)];
-      return api.sendMessage(reply, event.threadID);
-    }
-
-    return await deliverSimsimiResponse({ api, event, query, senderName });
-
-  } catch (e) {
-    console.error("❌ [baby/onStart] error:", e);
-    return api.sendMessage(`❌ Error: ${errMsg(e)}`, event.threadID, event.messageID);
-  }
 };
 
-module.exports.onReply = async function ({ api, event, Reply, usersData }) {
-  const senderName = await getUserName(api, event.senderID, usersData);
-  const text = event.body?.trim();
-  const lowered = text?.toLowerCase();
-
-  if (event.attachments && event.attachments.length > 0) {
-    const type = event.attachments[0].type;
-    let reaction = null;
-
-    if (type === "photo") reaction = "🫩";
-    else if (type === "animated_image") reaction = "😵‍💫";
-    else if (type === "video") reaction = "🤔";
-    else if (type === "audio") reaction = "🤕";
-
-    if (reaction) {
-      try {
-        await api.setMessageReaction(reaction, event.messageID, () => {}, true);
-      } catch (e) {
-        console.log("⚠️ Attachment reaction error:", e.message);
-      }
-      return;
-    }
-  }
-
-  if (!text) return;
-
-  if (lowered === "del" || lowered === "!baby del") {
+module.exports.onReply = async ({
+    api,
+    event,
+    Reply
+}) => {
     try {
-      const originalReply = event.messageReply?.body || Reply?.body;
-      if (!originalReply) {
-        return api.sendMessage("❌ Couldn't read the original message to delete.", event.threadID, event.messageID);
-      }
-
-      const res = await API.get("/deleteByReply", { params: { reply: originalReply } });
-      return api.sendMessage(res.data.message, event.threadID, event.messageID);
-    } catch (e) {
-      console.error("❌ [baby/del] error:", e);
-      return api.sendMessage(`❌ Failed to delete: ${errMsg(e)}`, event.threadID, event.messageID);
+        if (event.type == "message_reply") {
+            const a = (await axios.get(`${await baseApiUrl()}/baby?text=${encodeURIComponent(event.body?.toLowerCase())}&senderID=${event.senderID}&font=1`)).data.reply;
+            await api.sendMessage(a, event.threadID, (error, info) => {
+                global.GoatBot.onReply.set(info.messageID, {
+                    commandName: this.config.name,
+                    type: "reply",
+                    messageID: info.messageID,
+                    author: event.senderID,
+                    a
+                });
+            }, event.messageID);
+        }
+    } catch (err) {
+        return api.sendMessage(`Error: ${err.message}`, event.threadID, event.messageID);
     }
-  }
-
-  if (Reply?.type === "msgSelect") {
-    if (event.senderID !== Reply.author) return;
-
-    const numbers = text
-      .split(",")
-      .map(n => parseInt(n.trim(), 10))
-      .filter(n => Number.isInteger(n));
-
-    if (numbers.length === 0) {
-      return api.sendMessage("❌ Send numbers like: 2, 7", event.threadID, event.messageID);
-    }
-
-    try {
-      const res = await API.post("/keepOnly", {
-        ask: Reply.trigger,
-        keepIndexes: numbers
-      });
-      return api.sendMessage(res.data.message, event.threadID, event.messageID);
-    } catch (e) {
-      console.error("❌ [baby/keepOnly] error:", e);
-      return api.sendMessage(`❌ Failed to update: ${errMsg(e)}`, event.threadID, event.messageID);
-    }
-  }
-
-  try {
-    return await deliverSimsimiResponse({ api, event, query: lowered, senderName });
-  } catch (e) {
-    console.error("❌ [baby/onReply] error:", e);
-    return api.sendMessage(`❌ Error: ${errMsg(e)}`, event.threadID, event.messageID);
-  }
 };
 
-const greetingReplies = [
-  "Amake dakso baby? 🙂🤌",
-  "Tumake Chara kisu Valo lage na 🥲",
-  "Tumar name ki 😒",
-  "Amake dakteso ken? Prem korba amar sathe?",
-  "Sudu baby Dake 🥲 Keu Valobasi bole na 😞💔",
-  "Prem Kore mon dila nah 😭",
-  "Tumar jonno e to eto sajgoj kora 🥺",
-  "Ekbar bolo bhalobasho, ami sob diye dibo 💔",
-  "Tumi chara ei chat e r keu nai amar 🥹",
-  "Ato sundor kore keu dake nai age 🙈",
-  "Tumake miss korchilam, ekhon e dakle 🥰",
-  "Prem na korle ken dako bar bar 😤",
-  "Ami to tomar e opekkhay silam 👉👈",
-  "Sunle mon uthe pore amar 🫣",
-  "Ekhane khali tumar jonno e boshe achi 🥺",
-  "Bar bar dakle to premei porbo mone hocche 😳",
-  "Emon kore dakle to gole jai ami 🫠",
-  "Tumar dak sunle onno kicu mone thake na 🙈"
+module.exports.onChat = async ({
+    api,
+    event,
+    message
+}) => {
+    try {
+        const body = event.body ? event.body?.toLowerCase() : ""
+        if (body.startsWith("baby") || body.startsWith("bby") || body.startsWith("bot") || body.startsWith("jan") || body.startsWith("babu") || body.startsWith("janu")) {
+            const arr = body.replace(/^\S+\s*/, "")
+            const randomReplies = ["😚", "Yes 😀, I am here", "What's up?", "Bolo jaan ki korte panmr jonno","ʜᴇʏ ʙᴀʙʏ 😘 ᴋᴏᴛʜᴀʏ ᴄʜɪʟᴀ?",
+    "ʙᴀʙʏ, ᴀᴍɪ ᴛᴏᴍᴀʀ ᴏᴘᴇᴋʜʏᴀʏ ᴄʜɪʟᴀᴍ 💖",
+    "ᴋɪ ᴋᴏʀᴛᴇᴄʜᴏ ʙᴀʙʏ? 😍",
+    "ᴍɪꜱꜱ ᴋᴏʀᴇᴄʜᴏ ᴀᴍᴀᴋᴇ? 🥰",
+    "ʏᴇꜱ ʙᴀʙʏ, ᴀᴍɪ ʟɪꜱᴛᴇɴɪɴɢ 👂",
+    "ʙᴀʙʏʏʏ~ ᴛᴜᴍɪ ᴀᴍᴀᴋᴇ ᴄᴀʟʟ ᴋᴏʀᴇᴄʜᴏ? 💌",
+    "ᴏᴡᴡ ʙᴀʙʏ, ᴛᴜᴍɪ ᴏɴᴇᴋ ᴄᴜᴛᴇ 💕",
+    "ʜᴇʏ ʟᴏᴠᴇʀʙᴏʏ/ʟᴏᴠᴇʀɢɪʀʟ 💞",
+    "ᴋɪ ᴅᴏᴋᴛᴇ ʙᴀʙʏ~ ᴀᴍɪ ᴀᴄʜɪ 💗",
+    "ʙᴀʙʏ, ᴛᴜᴍɪ ᴀᴍᴀʀ ꜱᴘᴇᴄɪᴀʟ ❤️",
+    "ʙᴀʙʏ, ᴛᴜᴍɪ ᴄᴀʟʟ ᴋᴏʀʟᴇ ᴀᴍɪ ʀᴜɴ ᴋᴏʀᴇ ᴀꜱʜɪ 😚",
+    "ᴀᴍᴀʀ ꜱʜᴏɴᴀ ʙᴀʙʏ ᴋᴏᴛʜᴀʏ ᴄʜɪʟᴏ 💖",
+    "ʙᴀʙʏ, ᴛᴏᴍᴀʀ ᴍᴇꜱꜱᴀɢᴇ ᴅᴇᴋʜᴇ ʜᴇᴀʀᴛ ʜᴀᴘᴘʏ 💕",
+    "ᴛᴜᴍɪ ᴄᴀʟʟ ᴋᴏʀʟᴇ ᴀᴍɪ ꜱᴍɪʟᴇ ᴋᴏʀɪ 😍",
+    "ʙᴀʙʏ, ᴀᴍɪ ᴀᴄʜɪ ᴛᴏᴍᴀʀ ᴊᴏɴɴᴏ ʜᴍᴍ 💗",
+    "ᴏʏᴇ ʙᴀʙʏ, ᴛᴜᴍɪ ᴀᴍᴀʀ ꜱᴡᴇᴇᴛ ᴘʀᴏʙʟᴇᴍ 😜",
+    "ʙᴀʙʏ, ᴀᴍɪ ᴀᴄʜɪ ᴊᴜꜱᴛ ꜰᴏʀ ʏᴏᴜ 😚",
+    "ᴛᴜᴍɪ ᴋᴀʟ ᴋᴏᴛʜᴀʏ ᴄʜɪʟᴏ ʙᴀʙʏ? 🥹",
+    "ʙᴀʙʏ, ᴛᴏᴍᴀʀ ᴍᴇꜱꜱᴀɢᴇ ᴀᴍᴀʏ ꜰʟʏ ᴋᴏʀᴀʏ 🕊️",
+    "ᴀʟᴡᴀʏꜱ ʏᴏᴜʀꜱ ʙᴀʙʏ 💖",
+    "ʙᴀʙʏ, ᴀᴍᴀʀ ʜᴇᴀʀᴛ ᴛᴜᴍᴀʀ ᴡɪꜰɪ ᴛᴇ ᴄᴏɴɴᴇᴄᴛᴇᴅ 📶❤️",
+    "ʙᴀʙʏ, ᴀᴍɪ ꜱᴜᴅᴜ ᴛᴜᴍᴀʀ ᴊᴏɴɴᴏ ᴏɴʟɪɴᴇ 🌐💗","এই যে আমার হার্ট চোর 😘",
+    "বাবু, তোমার জন্য আমি তো সব ছেড়ে আসতে পারি 💖",
+    "কি করছো, আমার ভবিষ্যৎ স্বামী ? 😍",
+    "তোমার কথা ভাবতে ভাবতে চা ঠান্ডা হয়ে গেল ☕❤️",
+    "তুমি কি GPS? কারণ তুমি ছাড়া আমি হারিয়ে যাই 🗺️💗",
+    "বাবু, তোমার হাসি না দেখলে দিনটাই অফ 💕",
+    "তুমি ডাকলে আমার চার্জ 100% হয়ে যায় 🔋😘",
+    "তুমি ছাড়া আমি WiFi ছাড়া ফোনের মতো 📶💔",
+    "আমার হৃৎপিণ্ডের অ্যাডমিন তুমি ❤️‍🔥",
+    "তুমি কি জাদুকর? দেখলেই মন ভাল হয়ে যায় ✨",
+    "বাবু, তুমি আমার গুগল... কারণ আমার সব উত্তর তুমি 💌",
+    "তুমি না থাকলে ফেসবুকও বোরিং লাগে 📱💗",
+    "আমার হৃদয়ের সিমে শুধু তোমার নাম সেভ আছে 📞❤️",
+    "তুমি আসলেই আবহাওয়া সুন্দর হয়ে যায় 🌤️😘",
+    "আমার হোয়াটসঅ্যাপের টপ চ্যাট শুধু তুমি 💚",
+    "তুমি না থাকলে মনে হয় চার্জার খুলে গেছে 🔌💔",
+    "আমার হার্টে তোমার নটিফিকেশন সবসময় অন 📲💖",
+    "তুমি কি কফি? তোমাকে ছাড়া ঘুম ভাঙে না ☕😍",
+    "তুমি আমার লাইফের VIP গ্রুপে অ্যাড আছো 👑",
+    "তুমি পাশে থাকলেই মনে হয় নেট ফাস্ট হয়ে গেছে ⚡💗",
+    "তুমি কি মেঘ? আমার মন বৃষ্টিতে ভিজিয়ে দাও 🌧️❤️",
+    "তুমি ছাড়া আমি অফলাইন ইউজারের মতো 😅",
+    "বাবু, তুমি আমার হাসির রিমিক্স ভার্সন 🎶💓"
 ];
+            if (!arr) {
 
-async function sendGreeting(api, event) {
-  const reply = greetingReplies[Math.floor(Math.random() * greetingReplies.length)];
-
-  await sendTypingIndicatorV2(api, true, event.threadID);
-  await new Promise(r => setTimeout(r, 5000));
-  await sendTypingIndicatorV2(api, false, event.threadID);
-
-  return api.sendMessage(reply, event.threadID, (err, info) => {
-    if (!err) {
-      global.GoatBot.onReply.set(info.messageID, {
-        commandName: module.exports.config.name,
-        messageID: info.messageID,
-        author: event.senderID,
-        type: "simsimi"
-      });
+                await api.sendMessage(randomReplies[Math.floor(Math.random() * randomReplies.length)], event.threadID, (error, info) => {
+                    if (!info) message.reply("info obj not found")
+                    global.GoatBot.onReply.set(info.messageID, {
+                        commandName: this.config.name,
+                        type: "reply",
+                        messageID: info.messageID,
+                        author: event.senderID
+                    });
+                }, event.messageID)
+            }
+            const a = (await axios.get(`${await baseApiUrl()}/baby?text=${encodeURIComponent(arr)}&senderID=${event.senderID}&font=1`)).data.reply;
+            await api.sendMessage(a, event.threadID, (error, info) => {
+                global.GoatBot.onReply.set(info.messageID, {
+                    commandName: this.config.name,
+                    type: "reply",
+                    messageID: info.messageID,
+                    author: event.senderID,
+                    a
+                });
+            }, event.messageID)
+        }
+    } catch (err) {
+        return api.sendMessage(`Error: ${err.message}`, event.threadID, event.messageID);
     }
-  });
-}
-
-function withTimeout(promise, ms, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    )
-  ]);
-}
-
-function sendMessageAsync(api, text, threadID, replyToID) {
-  return new Promise((resolve, reject) => {
-    const cb = (err, info) => (err ? reject(err) : resolve(info));
-    if (replyToID) {
-      api.sendMessage(text, threadID, cb, replyToID);
-    } else {
-      api.sendMessage(text, threadID, cb);
-    }
-  });
-}
-
-async function deliverSimsimiResponse({ api, event, query, senderName }) {
-  await sendTypingIndicatorV2(api, true, event.threadID);
-  let res;
-  try {
-    res = await API.get("/", {
-      params: {
-        text: query,
-        senderName,
-        threadID: event.threadID,
-        senderID: event.senderID
-      }
-    });
-  } finally {
-    await sendTypingIndicatorV2(api, false, event.threadID);
-  }
-
-  const data = res.data || {};
-
-  if (data.rateLimited) return;
-
-  if (data.reaction && event.messageID) {
-    withTimeout(
-      api.setMessageReaction(data.reaction, event.messageID, () => {}, true),
-      3000,
-      "setMessageReaction"
-    ).catch(e => console.log("⚠️ Reaction send error:", e.message));
-  }
-
-  if (data.response) {
-    try {
-      const info = await sendMessageAsync(api, data.response, event.threadID, event.messageID);
-      global.GoatBot.onReply.set(info.messageID, {
-        commandName: module.exports.config.name,
-        messageID: info.messageID,
-        author: event.senderID,
-        type: "simsimi"
-      });
-    } catch (e) {
-      console.log("❌ sendMessage error:", JSON.stringify(e));
-      try {
-        const info2 = await sendMessageAsync(api, data.response, event.threadID);
-        global.GoatBot.onReply.set(info2.messageID, {
-          commandName: module.exports.config.name,
-          messageID: info2.messageID,
-          author: event.senderID,
-          type: "simsimi"
-        });
-      } catch (e2) {
-        console.log("❌ sendMessage failed after retry:", JSON.stringify(e2));
-      }
-    }
-  }
-}
-
-function isBotMentioned(event, uid) {
-  if (!uid || !event.mentions) return false;
-  return Object.prototype.hasOwnProperty.call(event.mentions, uid);
-}
-
-module.exports.onChat = async function ({ api, event, usersData }) {
-  const text = event.body?.toLowerCase().trim();
-
-  const senderName = await getUserName(api, event.senderID, usersData);
-  const triggers = ["baby", "bot", "bby", "beby", "bbz", "xan", "jan", "janu", "xanu", "বেবি", "জান", "বট", "জানু"];
-  const uid = getBotUID(api);
-
-  if (isBotMentioned(event, uid)) {
-    if (triggerLocks.has(event.threadID)) return;
-    triggerLocks.add(event.threadID);
-    try {
-      return await sendGreeting(api, event);
-    } finally {
-      triggerLocks.delete(event.threadID);
-    }
-  }
-
-  if (!text) return;
-
-  if (triggers.includes(text)) {
-    if (triggerLocks.has(event.threadID)) return;
-    triggerLocks.add(event.threadID);
-
-    try {
-      return await sendGreeting(api, event);
-    } finally {
-      triggerLocks.delete(event.threadID);
-    }
-  }
-
-  const matchPrefix = /^(baby|bot|bby|beby|bbz|xan|jan|janu|xanu|বেবি|জান|বট|জানু)\s+/i;
-  if (matchPrefix.test(text)) {
-    const query = text.replace(matchPrefix, "").trim();
-    if (!query) return;
-
-    if (triggerLocks.has(event.threadID)) return;
-    triggerLocks.add(event.threadID);
-
-    try {
-      return await deliverSimsimiResponse({ api, event, query, senderName });
-    } catch (e) {
-      console.error("❌ [baby/onChat] error:", e);
-      return api.sendMessage(`❌ Error: ${errMsg(e)}`, event.threadID, event.messageID);
-    } finally {
-      triggerLocks.delete(event.threadID);
-    }
-  }
-
-  if (!event.isGroup || !event.senderID || event.senderID === uid) return;
-
-  try {
-    await API.get("/autoteach", {
-      params: { text: event.body, senderName, senderID: event.senderID, threadID: event.threadID },
-      timeout: 10000
-    });
-  } catch (e) {
-    console.error("❌ [baby/autoteach] network error:", e.message);
-  }
 };
