@@ -17,19 +17,28 @@ module.exports = {
 
   onStart: async function ({ api, event }) {
     const ownerText = 
-`╭─ 👑 Oᴡɴᴇʀ Iɴғᴏ 👑 ─╮
-│ 👤 Nᴀᴍᴇ       : ᴀʜᴍᴇᴅ Sᴜᴍᴏɴ 亗
-│ 🧸 Nɪᴄᴋ       : Sᴜᴍᴏɴ
-│ 🎂 Aɢᴇ        : 19+
-│ 💘 Rᴇʟᴀᴛɪᴏɴ : Sɪɴɢʟᴇ
-│ 🎓 Pʀᴏғᴇssɪᴏɴ : Job
-│ 📚 Eᴅᴜᴄᴀᴛɪᴏɴ : SSC - 2024
-│ 🏡 Lᴏᴄᴀᴛɪᴏɴ : ᴍʏᴍᴇɴsɪɴɢʜ
-├─ 🔗 Cᴏɴᴛᴀᴄᴛ ─╮
-│ 📘 Facebook  : fb.com/AhmedSumon8790 
-│ 💬 Messenger: m.me/61576385979018 
-│ 📞 WhatsApp  : wa.me/01615197003
-╰────────────────╯`;
+ `
+╭━━━〔 👑 OWNER INFO 👑 〕━━━╮
+
+│ 👤 Name      : Muhammad Shoriful Islam
+│ 😎 Nickname  : SHORIF
+│ 🌍 Current   : Chandpur
+│ 🏡 Home Town : Sylhet
+
+├━━━〔 🔗 CONTACT ZONE 〕━━━
+
+│ 📘 Facebook  : https://www.facebook.com/profile.php?id=61594814459802
+
+│ 📩 Gmail     : Gmail নিয়ে এত চিন্তা কেন? 😂
+│               দরকার হলে আমার মালিকের ইনবক্সে লাড়া দাও,
+│               মালিকই ব্যবস্থা করে দেবে! 😎
+
+│ 📱 WhatsApp  : WhatsApp নম্বর খুঁজে লাভ নাই! 🤭
+│               মালিকের ইনবক্সে একটা গুতা দাও,
+│               তারপর আমার মালিকেও তোমাকে গুতা দিয়া দিবে! 😂
+
+╰━━━━━━━━━━━━━━━━━━━━━━╯
+`;
 
     const cacheDir = path.join(__dirname, "cache");
     const imgPath = path.join(cacheDir, "owner.jpg");
