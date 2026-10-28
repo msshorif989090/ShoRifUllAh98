@@ -12,8 +12,8 @@
   "antiInbox": false,
   "language": "en",
   "notesLanguage": "change language using ISO 639-1 code",
-  "nickNameBot": "—͞𝑺𝒊 𝒁𝒖⎯♡︎🎀ᡣ𐭩",
-  "prefix": "-",
+  "nickNameBot": "—͞Ntk buzz🕊️👀",
+  "prefix": "*",
   "enableTypingIndicator": true,
   "notesTypingIndicator": "true = show 'is typing...' for the humanizer delay before replying | false = reply instantly, no typing shown",
   "humanizer": {
@@ -36,7 +36,7 @@
     "ignoreCommand": []
   },
   "adminBot": [
-    "61576385979018",
+    "61595721699443",
     " ",
     " "
   ],
