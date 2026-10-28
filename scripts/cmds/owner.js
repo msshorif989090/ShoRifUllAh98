@@ -6,7 +6,7 @@ module.exports = {
   config: {
     name: "owner",
     version: "1.3.0",
-    author: "Mᴏʜᴀᴍᴍᴀᴅ Aᴋᴀsʜ",
+    author: "Muhammad Shoriful Islam",
     role: 0,
     shortDescription: "Owner information with image",
     category: "Information",
@@ -45,7 +45,7 @@ module.exports = {
 
     if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir);
 
-    const imgLink = "https://i.imgur.com/1G4ZhU7.jpeg";
+    const imgLink = "https://kommodo.ai/i/hvi3yBqDAU0Y0eRyLN1N";
 
     const send = () => {
       api.sendMessage(
