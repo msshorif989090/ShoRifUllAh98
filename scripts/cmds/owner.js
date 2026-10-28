@@ -45,7 +45,7 @@ module.exports = {
 
     if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir);
 
-    const imgLink = "https://kommodo.ai/i/hvi3yBqDAU0Y0eRyLN1N";
+    const imgLink = "https://plain-apac-prod-public.komododecks.com/202610/28/hvi3yBqDAU0Y0eRyLN1N/image.png";
 
     const send = () => {
       api.sendMessage(
