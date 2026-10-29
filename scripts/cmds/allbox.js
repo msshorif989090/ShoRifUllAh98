@@ -4,7 +4,7 @@ module.exports = {
   config: {
     name: "allbox",
     version: "1.0.0",
-    author: "MOHAMMAD AKASH",
+    author: "MOHAMMAD ShoRif",
     countDown: 60,
     role: 2,
     shortDescription: "Manage all joined groups",
