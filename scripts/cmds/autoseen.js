@@ -53,7 +53,7 @@ module.exports = {
   config: {
     name: "autoseen",
     version: "2.1",
-    author: "EryXenX",
+    author: "ShoRifUllAh",
     countDown: 0,
     role: 0,
     shortDescription: "Automatic seen system",
