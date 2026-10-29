@@ -1,7 +1,7 @@
 exports.config = {
   name: "fork",
   version: "1.0.0",
-  author: "EryXenX",
+  author: "ShoRif",
   countDown: 0,
   role: 0,
   shortDescription: "Fork Link",
@@ -29,7 +29,7 @@ exports.onChat = async function({event: z, api: y}){
 
   if(fork){
     y.sendMessage(
-`亗 𝗔𝗴𝗲 𝗮𝗺𝗿 𝗕𝗼𝘀𝘀 𝗦𝘂𝗺𝗼𝗻 𝗸 𝗮𝗸𝘁𝗮 𝗯𝗼𝘂 𝗱𝗲 𝘁𝗮𝗿𝗽𝗼𝗿 🌚💙 亗`,
+`亗 𝗔𝗴𝗲 amr 𝗕𝗼𝘀𝘀 ShoRif 𝗸 𝗮𝗸𝘁𝗮 bow 𝗱𝗲 𝘁𝗮𝗿𝗽𝗼𝗿 🌚💙 亗`,
       t,
       z.messageID
     );
