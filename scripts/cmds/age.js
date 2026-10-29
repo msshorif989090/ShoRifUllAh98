@@ -5,7 +5,7 @@ module.exports = {
     name: "age",
     aliases: ["myage"],
     version: "6.0",
-    author: "𝐌𝐨𝐡𝐚ᴍᴍᴀᴅ 𝐀ᴋᴀsʜ",
+    author: "𝐌𝐨𝐡𝐚ᴍᴍᴀᴅ ShoRif",
     role: 0,
     category: "AI",
     guide: "age <YYYY | DD/MM/YYYY | D Month YYYY | D/Month/YYYY>",
