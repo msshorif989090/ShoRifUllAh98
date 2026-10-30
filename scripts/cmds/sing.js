@@ -2,178 +2,261 @@ const axios = require("axios");
 const yts = require("yt-search");
 const fs = require("fs");
 const path = require("path");
+const { pipeline } = require("stream/promises");
 
 const CACHE_DIR = path.join(__dirname, "cache");
 const SONG_API_BASE = "https://eryxenx.agi.bd/api/song";
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function getError(err) {
+    const data = err.response?.data;
+
+    if (typeof data === "string") return data.slice(0, 300);
+
+    return data?.error ||
+        data?.message ||
+        err.message ||
+        "Unknown error";
+}
+
+async function requestWithRetry(request, retries = 2) {
+    for (let i = 0; i <= retries; i++) {
+        try {
+            return await request();
+        } catch (err) {
+            const status = err.response?.status;
+
+            const retryable =
+                !status ||
+                [408, 429, 500, 502, 503, 504].includes(status);
+
+            if (!retryable || i === retries) {
+                throw err;
+            }
+
+            console.log(
+                `[sing] Retry ${i + 1}/${retries}: ${getError(err)}`
+            );
+
+            await sleep(2000 * (i + 1));
+        }
+    }
+}
+
+function createCache() {
+    if (!fs.existsSync(CACHE_DIR)) {
+        fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+}
+
+function tempFilePath() {
+    createCache();
+
+    return path.join(
+        CACHE_DIR,
+        `song_${Date.now()}_${Math.floor(Math.random() * 9999)}.mp3`
+    );
+}
+
 async function fetchSongInfo(videoUrl) {
-	const infoRes = await axios.get(SONG_API_BASE, {
-		params: { url: videoUrl },
-		timeout: 60000
-	});
+    const response = await requestWithRetry(() =>
+        axios.get(SONG_API_BASE, {
+            params: { url: videoUrl },
+            timeout: 60000
+        })
+    );
 
-	const data = infoRes.data;
-	if (!data?.success || !data?.downloadUrl) {
-		throw new Error(data?.error || "downloadUrl paoa jayni API response e");
-	}
-	return data;
+    const data = response.data;
+
+    if (!data?.success || !data?.downloadUrl) {
+        throw new Error(
+            data?.error || "Song API download URL dey nai."
+        );
+    }
+
+    return data;
 }
 
-async function streamDownloadToFile(dlUrl, filePath) {
-	if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+async function downloadSong(url, filePath) {
+    if (!url || !/^https?:\/\//i.test(url)) {
+        throw new Error("Invalid download URL.");
+    }
 
-	const response = await axios.get(dlUrl, {
-		responseType: "stream",
-		timeout: 300000,
-		maxContentLength: Infinity,
-		maxBodyLength: Infinity,
-		headers: {
-			"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1"
-		}
-	});
+    const response = await requestWithRetry(() =>
+        axios.get(url, {
+            responseType: "stream",
+            timeout: 300000,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            headers: {
+                "User-Agent": "Mozilla/5.0"
+            }
+        })
+    );
 
-	const contentType = response.headers["content-type"] || "";
-	const isValid = contentType.includes("video") || contentType.includes("audio") || contentType.includes("octet-stream");
+    const contentType =
+        response.headers["content-type"] || "";
 
-	if (!isValid) {
-		let bodyText = "";
-		try {
-			const chunks = [];
-			for await (const chunk of response.data) {
-				chunks.push(chunk);
-				if (Buffer.concat(chunks).length > 2000) break;
-			}
-			bodyText = Buffer.concat(chunks).toString("utf-8").slice(0, 500);
-		} catch (_) {}
+    if (
+        contentType &&
+        !/audio|video|octet-stream/i.test(contentType)
+    ) {
+        response.data.destroy();
 
-		throw new Error(
-			`Invalid content received from downloadUrl (type: ${contentType})` +
-			(bodyText ? ` — upstream said: "${bodyText.trim()}"` : "")
-		);
-	}
+        throw new Error(
+            `Invalid audio file. Content-Type: ${contentType}`
+        );
+    }
 
-	const writer = fs.createWriteStream(filePath);
+    try {
+        await pipeline(
+            response.data,
+            fs.createWriteStream(filePath)
+        );
 
-	await new Promise((resolve, reject) => {
-		response.data.pipe(writer);
-		let failed = false;
-		const onError = (err) => {
-			if (failed) return;
-			failed = true;
-			writer.close();
-			fs.unlink(filePath, () => {});
-			reject(err);
-		};
-		response.data.on("error", onError);
-		writer.on("error", onError);
-		writer.on("close", () => { if (!failed) resolve(); });
-	});
+        const stats = fs.statSync(filePath);
 
-	const stats = fs.statSync(filePath);
-	if (stats.size < 1024) {
-		fs.unlink(filePath, () => {});
-		throw new Error(`Downloaded file too small (${stats.size} bytes) — corrupt ba failed download`);
-	}
+        if (stats.size < 1024) {
+            throw new Error("Downloaded file is too small.");
+        }
+
+    } catch (err) {
+        try {
+            fs.unlinkSync(filePath);
+        } catch (_) {}
+
+        throw err;
+    }
 }
 
-function extractApiErrorMessage(err) {
-	const raw = err.response?.data;
+async function sendSong(message, data) {
+    for (let i = 0; i < 3; i++) {
+        try {
+            return await message.reply(data);
+        } catch (err) {
+            console.error("[sing] Send error:", err.message);
 
-	if (raw && typeof raw === "object" && !Buffer.isBuffer(raw)) {
-		if (raw.error) return raw.error;
-		if (raw.message) return raw.message;
-	}
+            if (i === 2) throw err;
 
-	if (raw) {
-		try {
-			const text = Buffer.isBuffer(raw) ? raw.toString("utf-8") : String(raw);
-			const parsed = JSON.parse(text);
-			if (parsed?.error) return parsed.error;
-			if (parsed?.message) return parsed.message;
-		} catch (_) {}
-	}
-
-	return err.message;
-}
-
-function tempFilePath(ext) {
-	if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
-	return path.join(CACHE_DIR, `sing_${Date.now()}_${Math.floor(Math.random() * 1e4)}.${ext}`);
-}
-
-async function sendWithRetry(message, msg, retries = 2) {
-	for (let i = 0; i <= retries; i++) {
-		try {
-			return await message.reply(msg);
-		} catch (err) {
-			const is408 = err?.error === 408 || String(err?.message || err).includes("408");
-			if (is408 && i < retries) {
-				console.warn(`[sing] Upload timeout, retrying (${i + 1}/${retries})...`);
-				await new Promise(r => setTimeout(r, 2000));
-				continue;
-			}
-			throw err;
-		}
-	}
+            await sleep(2000);
+        }
+    }
 }
 
 function react(api, messageID, emoji) {
-	try {
-		api.setMessageReaction(emoji, messageID, () => {}, true);
-	} catch (_) {}
+    try {
+        api.setMessageReaction(
+            emoji,
+            messageID,
+            () => {},
+            true
+        );
+    } catch (_) {}
 }
 
 module.exports.config = {
-	name: "sing",
-	aliases: ["song"],
-	version: "2.0.0",
-	author: "EryXenX",
-	countDown: 5,
-	role: 0,
-	shortDescription: "YouTube theke gaan download",
-	longDescription: "Song name diye sorasori mp3 download kore pathay",
-	category: "media",
-	guide: {
-		en: "{pn} <song name>\nExample: {pn} mann mera"
-	}
+    name: "sing",
+    aliases: ["song"],
+    version: "3.0.0",
+    author: "ShoRif",
+    countDown: 5,
+    role: 0,
+
+    shortDescription: "YouTube song search and download",
+
+    longDescription: "Search songs and send audio",
+
+    category: "media",
+
+    guide: {
+        en: "{pn} <song name>\nExample: {pn} mann mera"
+    }
 };
 
-module.exports.onStart = async function ({ api, event, args, message }) {
-	const { messageID } = event;
-	const query = args.join(" ").trim();
+module.exports.onStart = async function ({
+    api,
+    event,
+    args,
+    message
+}) {
+    const { messageID } = event;
 
-	if (!query) {
-		return message.reply("❌ Song name den.\nExample: sing mann mera");
-	}
+    const query = args.join(" ").trim();
 
-	react(api, messageID, "⏳");
+    if (!query) {
+        return message.reply(
+            "❌ Song name den.\nExample: sing mann mera"
+        );
+    }
 
-	let file;
-	try {
-		const search = await yts(query);
-		const video = search.videos?.[0];
-		if (!video) {
-			react(api, messageID, "❌");
-			return message.reply(`❌ "${query}" er kono result paoa jayni`);
-		}
+    let file;
 
-		const info = await fetchSongInfo(video.url);
-		file = tempFilePath("mp3");
-		await streamDownloadToFile(info.downloadUrl, file);
+    let stage = "YouTube Search";
 
-		await sendWithRetry(message, {
-			body: `🎶 ${info.title || video.title}\n🕒 ${video.timestamp}`,
-			attachment: fs.createReadStream(file)
-		});
+    react(api, messageID, "⏳");
 
-		react(api, messageID, "✅");
-	} catch (err) {
-		console.error(err);
-		react(api, messageID, "❌");
-		return message.reply("❌ Download failed: " + extractApiErrorMessage(err));
-	} finally {
-		if (file) {
-			try { fs.unlinkSync(file); } catch (e) { console.error("[sing] cleanup error:", e.message); }
-		}
-	}
+    try {
+        console.log("[sing] Searching:", query);
+
+        const search = await yts(query);
+
+        const video = search.videos?.[0];
+
+        if (!video) {
+            throw new Error("No song found.");
+        }
+
+        stage = "Song API";
+
+        console.log("[sing] Found:", video.title);
+
+        const info = await fetchSongInfo(video.url);
+
+        stage = "Song Download";
+
+        file = tempFilePath();
+
+        await downloadSong(info.downloadUrl, file);
+
+        stage = "Messenger Upload";
+
+        await sendSong(message, {
+            body:
+                `🎵 ${info.title || video.title}\n` +
+                `⏱ ${video.timestamp || "Unknown"}`,
+            attachment: fs.createReadStream(file)
+        });
+
+        react(api, messageID, "✅");
+
+        console.log("[sing] Success:", video.title);
+
+    } catch (err) {
+        console.error(
+            `[sing] ${stage} Error:`,
+            err.response?.status || "",
+            getError(err)
+        );
+
+        react(api, messageID, "❌");
+
+        let errorMessage = getError(err);
+
+        if (err.response?.status === 503) {
+            errorMessage =
+                "Server temporarily unavailable (503). Please try again later.";
+        }
+
+        return message.reply(
+            `❌ ${stage} Failed:\n${errorMessage}`
+        );
+
+    } finally {
+        if (file && fs.existsSync(file)) {
+            try {
+                fs.unlinkSync(file);
+            } catch (_) {}
+        }
+    }
 };
