@@ -573,4 +573,4 @@ async function createWelcomeCard(data) {
   );
 
   return filePath;
-                                            }
+    }
