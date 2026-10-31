@@ -1,412 +1,719 @@
-const { drive } = global.utils;
-const { nickNameBot } = global.GoatBot.config;
+/**
+ * GoatBot V2 Welcome Event
+ * 6 Random Premium Color Themes
+ * Original Card Design + Framework Features
+ */
+
+const { drive } = global.utils || {};
+const nickNameBot = global.GoatBot?.config?.nickNameBot;
+
 const { createCanvas, loadImage } = require("canvas");
+const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
-const axios = require("axios");
+
+// ========================================
+// 6 PREMIUM COLOR THEMES
+// ========================================
+
+const THEMES = [
+  {
+    name: "ELECTRIC BLUE",
+    bg1: "#06152f",
+    bg2: "#0877d8",
+    accent: "#42d8ff",
+    light: "#b9f4ff",
+    panel: "rgba(4,23,52,.84)"
+  },
+  {
+    name: "ROYAL PURPLE",
+    bg1: "#190b35",
+    bg2: "#7136c9",
+    accent: "#d5a6ff",
+    light: "#f1d8ff",
+    panel: "rgba(31,10,57,.85)"
+  },
+  {
+    name: "EMERALD GREEN",
+    bg1: "#042b25",
+    bg2: "#079b70",
+    accent: "#57ffd0",
+    light: "#c6ffeb",
+    panel: "rgba(2,39,32,.85)"
+  },
+  {
+    name: "CRIMSON RED",
+    bg1: "#300815",
+    bg2: "#c32645",
+    accent: "#ff718b",
+    light: "#ffd0d9",
+    panel: "rgba(48,5,22,.85)"
+  },
+  {
+    name: "ROYAL GOLD",
+    bg1: "#281a05",
+    bg2: "#a97919",
+    accent: "#ffdc72",
+    light: "#fff0bb",
+    panel: "rgba(43,27,4,.87)"
+  },
+  {
+    name: "NEON CYAN",
+    bg1: "#03252d",
+    bg2: "#078da0",
+    accent: "#52f5ff",
+    light: "#c5ffff",
+    panel: "rgba(1,35,43,.86)"
+  }
+];
+
+const SETTINGS = {
+  width: 1200,
+  height: 650,
+
+  welcomeText: "WELCOME TO OUR FAMILY",
+
+  message: "👑 Welcome {userName}!\n✨ Welcome to {threadName}\n🎉 You are our {memberCount} member!\n💎 Enjoy your stay!",
+
+  footer: "👑 Powered By M SHORIF ULLAH 👑",
+
+  sendText: true,
+
+  cacheDir: path.join(__dirname, "cache", "welcome")
+};
+
+// ========================================
+// HELPERS
+// ========================================
+
+const randomTheme = () =>
+  THEMES[Math.floor(Math.random() * THEMES.length)];
+
+const clean = (v, fallback = "Unknown") =>
+  String(v || fallback).replace(/[<>]/g, "").trim();
+
+async function downloadImage(url, file) {
+  if (!url) return null;
+
+  try {
+    const res = await axios.get(url, {
+      responseType: "arraybuffer",
+      timeout: 15000,
+      headers: {
+        "User-Agent": "Mozilla/5.0"
+      }
+    });
+
+    await fs.ensureDir(path.dirname(file));
+    await fs.writeFile(file, res.data);
+
+    return file;
+  } catch (_) {
+    return null;
+  }
+}
+
+function rounded(ctx, x, y, w, h, r, fill, stroke, line = 2) {
+  ctx.beginPath();
+
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+
+  ctx.closePath();
+
+  if (fill) {
+    ctx.fillStyle = fill;
+    ctx.fill();
+  }
+
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = line;
+    ctx.stroke();
+  }
+}
+
+function cover(ctx, img, x, y, w, h) {
+  const scale = Math.max(
+    w / img.width,
+    h / img.height
+  );
+
+  const sw = w / scale;
+  const sh = h / scale;
+
+  ctx.drawImage(
+    img,
+    (img.width - sw) / 2,
+    (img.height - sh) / 2,
+    sw,
+    sh,
+    x,
+    y,
+    w,
+    h
+  );
+}
+
+function avatar(ctx, img, x, y, size, accent) {
+  ctx.save();
+
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 22;
+
+  ctx.beginPath();
+
+  ctx.arc(
+    x + size / 2,
+    y + size / 2,
+    size / 2 + 7,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.fillStyle = accent;
+  ctx.fill();
+
+  ctx.restore();
+
+  ctx.save();
+
+  ctx.beginPath();
+
+  ctx.arc(
+    x + size / 2,
+    y + size / 2,
+    size / 2,
+    0,
+    Math.PI * 2
+  );
+
+  ctx.clip();
+
+  if (img) {
+    cover(ctx, img, x, y, size, size);
+  } else {
+    ctx.fillStyle = "#26364d";
+    ctx.fillRect(x, y, size, size);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 60px Arial";
+    ctx.textAlign = "center";
+
+    ctx.fillText(
+      "?",
+      x + size / 2,
+      y + size / 2 + 20
+    );
+  }
+
+  ctx.restore();
+}
+
+function fit(ctx, text, max, initial) {
+  let size = initial;
+
+  do {
+    ctx.font = `bold ${size}px Arial`;
+
+    if (
+      ctx.measureText(text).width <= max ||
+      size <= 22
+    ) {
+      break;
+    }
+
+    size -= 2;
+
+  } while (size > 20);
+
+  return size;
+}
+
+// ========================================
+// PROFILE IMAGE
+// ========================================
+
+async function getProfile(uid, api) {
+  try {
+    const info = await api.getUserInfo([uid]);
+    const user = info[uid] || {};
+
+    return (
+      user.thumbSrc ||
+      user.profileUrl ||
+      user.photoUrl ||
+      null
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+// ========================================
+// WELCOME CARD GENERATOR
+// ========================================
+
+async function buildCard(info) {
+  const theme = randomTheme();
+
+  const W = SETTINGS.width;
+  const H = SETTINGS.height;
+  const dir = SETTINGS.cacheDir;
+
+  const stamp =
+    `${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+
+  const files = await Promise.all([
+    downloadImage(
+      info.memberURL,
+      path.join(dir, `member-${stamp}.jpg`)
+    ),
+
+    downloadImage(
+      info.groupURL,
+      path.join(dir, `group-${stamp}.jpg`)
+    ),
+
+    downloadImage(
+      info.adderURL,
+      path.join(dir, `adder-${stamp}.jpg`)
+    )
+  ]);
+
+  try {
+    const imgs = await Promise.all(
+      files.map(async f => {
+        try {
+          return f ? await loadImage(f) : null;
+        } catch (_) {
+          return null;
+        }
+      })
+    );
+
+    const [memberImg, groupImg, adderImg] = imgs;
+
+    const canvas = createCanvas(W, H);
+    const ctx = canvas.getContext("2d");
+
+    // Background
+    const gradient = ctx.createLinearGradient(
+      0, 0, W, H
+    );
+
+    gradient.addColorStop(0, theme.bg1);
+    gradient.addColorStop(1, theme.bg2);
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, W, H);
+
+    // Decorative lines
+    ctx.save();
+
+    ctx.globalAlpha = 0.12;
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 2;
+
+    for (let i = -H; i < W; i += 48) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i + H, H);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+
+    // Card frame
+    rounded(
+      ctx,
+      24, 24,
+      W - 48,
+      H - 48,
+      34,
+      "rgba(0,0,0,.10)",
+      theme.accent,
+      4
+    );
+
+    rounded(
+      ctx,
+      43, 43,
+      W - 86,
+      H - 86,
+      27,
+      theme.panel,
+      "rgba(255,255,255,.2)",
+      2
+    );
+
+    // Header
+    ctx.textAlign = "center";
+    ctx.shadowColor = theme.accent;
+    ctx.shadowBlur = 20;
+
+    ctx.fillStyle = theme.light;
+    ctx.font = "bold 54px Arial";
+
+    ctx.fillText(
+      SETTINGS.welcomeText,
+      W / 2,
+      120
+    );
+
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "24px Arial";
+
+    ctx.fillText(
+      "WE ARE HAPPY TO HAVE YOU HERE",
+      W / 2,
+      160
+    );
+
+    // Member avatar
+    avatar(
+      ctx,
+      memberImg,
+      105,
+      205,
+      210,
+      theme.accent
+    );
+
+    // Member name
+    ctx.textAlign = "left";
+
+    ctx.fillStyle = theme.light;
+    ctx.font = "bold 25px Arial";
+
+    ctx.fillText(
+      "NEW MEMBER",
+      365,
+      250
+    );
+
+    ctx.font =
+      `bold ${fit(ctx, info.memberName, 720, 48)}px Arial`;
+
+    ctx.fillStyle = "#fff";
+
+    ctx.fillText(
+      info.memberName,
+      365,
+      315
+    );
+
+    // Member number
+    ctx.fillStyle = theme.accent;
+    ctx.font = "bold 30px Arial";
+
+    ctx.fillText(
+      `MEMBER NO. ${info.memberCount}`,
+      365,
+      370
+    );
+
+    // Group panel
+    rounded(
+      ctx,
+      350, 405,
+      740, 105,
+      20,
+      "rgba(255,255,255,.08)",
+      "rgba(255,255,255,.2)",
+      2
+    );
+
+    avatar(
+      ctx,
+      groupImg,
+      377,
+      419,
+      76,
+      theme.accent
+    );
+
+    ctx.fillStyle = theme.light;
+    ctx.font = "bold 20px Arial";
+
+    ctx.fillText("GROUP", 480, 447);
+
+    ctx.font =
+      `bold ${fit(ctx, info.groupName, 590, 30)}px Arial`;
+
+    ctx.fillStyle = "#fff";
+
+    ctx.fillText(
+      info.groupName,
+      480,
+      483
+    );
+
+    // Added by
+    avatar(
+      ctx,
+      adderImg,
+      105,
+      455,
+      78,
+      theme.accent
+    );
+
+    ctx.fillStyle = theme.light;
+    ctx.font = "bold 18px Arial";
+
+    ctx.fillText("ADDED BY", 205, 480);
+
+    ctx.fillStyle = "#fff";
+
+    ctx.font =
+      `bold ${fit(ctx, info.adderName, 130, 23)}px Arial`;
+
+    ctx.fillText(
+      info.adderName,
+      205,
+      510
+    );
+
+    // Footer
+    ctx.textAlign = "center";
+    ctx.fillStyle = theme.accent;
+    ctx.font = "bold 21px Arial";
+
+    ctx.fillText(
+      SETTINGS.footer,
+      W / 2,
+      585
+    );
+
+    await fs.ensureDir(dir);
+
+    const output = path.join(
+      dir,
+      `welcome-${stamp}.png`
+    );
+
+    await fs.writeFile(
+      output,
+      canvas.toBuffer("image/png")
+    );
+
+    return {
+      output,
+      theme
+    };
+
+  } finally {
+    for (const f of files) {
+      if (f) {
+        await fs.remove(f).catch(() => {});
+      }
+    }
+  }
+}
+
+// ========================================
+// GOATBOT WELCOME EVENT
+// ========================================
 
 module.exports = {
   config: {
     name: "welcome",
-    version: "9.1",
+    version: "10.0",
     author: "M SHORIF ULLAH",
     category: "events"
   },
 
   langs: {
     en: {
-      defaultWelcomeMessage:
-        "👑 Welcome {userName}!\n✨ Welcome to {threadName}\n🎉 You are our {memberCount} member!\n💎 Enjoy your stay!",
       botAddedMessage:
         "👑 Thanks for adding me to your group!\n⚙️ Type /help to see commands."
     }
   },
 
-  onStart: async ({ threadsData, message, event, api, usersData, getLang }) => {
-    if (event.logMessageType !== "log:subscribe") return;
+  onStart: async function ({
+    threadsData,
+    message,
+    event,
+    api,
+    usersData,
+    getLang
+  }) {
+    if (event.logMessageType !== "log:subscribe") {
+      return;
+    }
 
     const { threadID } = event;
+
     const threadData = await threadsData.get(threadID);
 
-    if (!threadData.settings.sendWelcomeMessage) return;
+    if (!threadData.settings?.sendWelcomeMessage) {
+      return;
+    }
 
-    const addedMembers = event.logMessageData.addedParticipants || [];
-    const threadName = threadData.threadName || "Our Group";
+    const addedMembers =
+      event.logMessageData?.addedParticipants || [];
+
+    if (!addedMembers.length) return;
+
+    const threadName = clean(
+      threadData.threadName,
+      "Our Group"
+    );
+
     const inviterID = event.author;
     const botID = api.getCurrentUserID();
 
-    for (const user of addedMembers) {
-      const userID = user.userFbId;
+    let threadInfo = {};
 
-      if (userID == botID) {
+    try {
+      threadInfo = await api.getThreadInfo(threadID);
+    } catch (err) {
+      console.log("Thread info unavailable:", err.message);
+    }
+
+    const groupURL =
+      threadInfo.imageSrc ||
+      threadInfo.image ||
+      null;
+
+    for (const user of addedMembers) {
+      const userID = user.userFbId || user.id;
+
+      if (!userID) continue;
+
+      // Bot added to group
+      if (String(userID) === String(botID)) {
         if (nickNameBot) {
-          await api.changeNickname(nickNameBot, threadID, botID);
+          try {
+            await api.changeNickname(
+              nickNameBot,
+              threadID,
+              botID
+            );
+          } catch (err) {
+            console.log("Nickname Error:", err.message);
+          }
         }
-        return message.send(getLang("botAddedMessage"));
+
+        const botMessage = getLang
+          ? getLang("botAddedMessage")
+          : "👑 Thanks for adding me to your group!\n⚙️ Type /help to see commands.";
+
+        await message.send(botMessage);
+        continue;
       }
 
-      const userName = user.fullName || "New Member";
+      const userInfo = await api.getUserInfo([userID]);
+      const memberData = userInfo[userID] || {};
+
+      const userName = clean(
+        user.fullName || memberData.name,
+        "New Member"
+      );
 
       let inviterName = "Group Admin";
+
       try {
         if (inviterID) {
           inviterName = await usersData.getName(inviterID);
         }
       } catch (_) {}
 
-      let memberCount = event.participantIDs
-        ? event.participantIDs.length
-        : 0;
+      let adderURL = null;
 
-      let welcomeMessage =
-        threadData.data.welcomeMessage ||
-        getLang("defaultWelcomeMessage");
+      if (inviterID) {
+        adderURL = await getProfile(inviterID, api);
+      }
 
-      welcomeMessage = welcomeMessage
+      const memberURL =
+        memberData.thumbSrc ||
+        memberData.profileUrl ||
+        memberData.photoUrl ||
+        null;
+
+      let memberCount =
+        Array.isArray(event.participantIDs)
+          ? event.participantIDs.length
+          : Array.isArray(threadInfo.participantIDs)
+            ? threadInfo.participantIDs.length
+            : "—";
+
+      const welcomeMessage =
+        threadData.data?.welcomeMessage ||
+        SETTINGS.message;
+
+      const finalMessage = welcomeMessage
         .replace(/\{userName\}/g, userName)
         .replace(/\{userTag\}/g, userName)
         .replace(/\{threadName\}/g, threadName)
-        .replace(/\{memberCount\}/g, memberCount)
+        .replace(/\{memberCount\}/g, String(memberCount))
         .replace(/\{inviterName\}/g, inviterName);
 
       let welcomeImagePath = null;
 
       try {
-        welcomeImagePath = await createWelcomeCard({
-          userName,
-          threadName,
+        const result = await buildCard({
+          memberName: userName,
+          groupName: threadName,
           memberCount,
-          inviterName,
-          newUserID: userID,
-          inviterID,
-          threadID,
-          api
+          adderName: inviterName,
+          memberURL,
+          groupURL,
+          adderURL
         });
+
+        welcomeImagePath = result.output;
+
       } catch (err) {
         console.error("Welcome Card Error:", err);
       }
 
       const form = {
-        body: welcomeMessage,
-        mentions: [{ tag: userName, id: userID }]
+        body: SETTINGS.sendText ? finalMessage : "",
+        mentions: [
+          {
+            tag: userName,
+            id: userID
+          }
+        ]
       };
 
-      if (welcomeImagePath && fs.existsSync(welcomeImagePath)) {
-        form.attachment = fs.createReadStream(welcomeImagePath);
-      } else if (threadData.data.welcomeAttachment) {
+      if (
+        welcomeImagePath &&
+        await fs.pathExists(welcomeImagePath)
+      ) {
+        form.attachment =
+          fs.createReadStream(welcomeImagePath);
+
+      } else if (
+        Array.isArray(threadData.data?.welcomeAttachment) &&
+        drive?.getFile
+      ) {
         const attachments = threadData.data.welcomeAttachment
           .map(f => drive.getFile(f, "stream"));
 
-        form.attachment = (await Promise.allSettled(attachments))
+        const results = await Promise.allSettled(attachments);
+
+        form.attachment = results
           .filter(x => x.status === "fulfilled")
           .map(x => x.value);
       }
 
-      await message.send(form);
-
-      if (welcomeImagePath && fs.existsSync(welcomeImagePath)) {
-        setTimeout(() => {
-          try {
-            fs.unlinkSync(welcomeImagePath);
-          } catch (_) {}
-        }, 10000);
+      try {
+        await message.send(form);
+      } finally {
+        if (welcomeImagePath) {
+          setTimeout(() => {
+            fs.remove(welcomeImagePath).catch(() => {});
+          }, 10000);
+        }
       }
     }
   }
 };
-
-
-// ========================================
-// 13 VIP DESIGNS (Optimized)
-// ========================================
-
-const DESIGNS = [
-  { name: "Gold Royal", legendary: false, bg: "#100c08", main: "#d6a83d", second: "#fff0a6", glow: "#ffd700" },
-  { name: "Purple King", legendary: false, bg: "#10091d", main: "#a66cff", second: "#edcaff", glow: "#b56cff" },
-  { name: "Neon Blue", legendary: false, bg: "#06111e", main: "#29c7ff", second: "#c4f4ff", glow: "#00cfff" },
-  { name: "Pink Romantic", legendary: false, bg: "#1c0815", main: "#ff73b7", second: "#ffd4e9", glow: "#ff4da6" },
-  { name: "Red Devil", legendary: false, bg: "#1a0709", main: "#ff4545", second: "#ffc0c0", glow: "#ff2424" },
-  { name: "Emerald Green", legendary: false, bg: "#06150e", main: "#28d68a", second: "#c0ffe0", glow: "#00ff99" },
-  { name: "Butterfly", legendary: false, bg: "#10091a", main: "#c28aff", second: "#f3d8ff", glow: "#dc8aff" },
-  { name: "Black Luxury", legendary: false, bg: "#080808", main: "#c5c5c5", second: "#ffffff", glow: "#aaaaaa" },
-  { name: "Gold Emperor", legendary: true, bg: "#100b02", main: "#ffca28", second: "#fff3b0", glow: "#ffb300" },
-  { name: "Diamond Royal", legendary: true, bg: "#06121c", main: "#7eeaff", second: "#ffffff", glow: "#00d9ff" },
-  { name: "Black Emperor", legendary: true, bg: "#050505", main: "#e7c66b", second: "#ffffff", glow: "#ffcc33" },
-  { name: "Galaxy Legend", legendary: true, bg: "#0b0620", main: "#bd83ff", second: "#e9d5ff", glow: "#8c43ff" },
-  { name: "Crown Master", legendary: true, bg: "#150707", main: "#ffb347", second: "#ffe5a3", glow: "#ff7b00" }
-];
-
-function randomDesign() {
-  return DESIGNS[Math.floor(Math.random() * DESIGNS.length)];
-}
-
-
-// ========================================
-// PROFILE & GROUP IMAGE FETCHERS
-// ========================================
-
-async function getProfile(uid, api) {
-  try {
-    const info = await api.getUserInfo([uid]);
-    const url = info[uid]?.thumbSrc;
-    if (url) {
-      const res = await axios.get(url, { responseType: "arraybuffer", timeout: 12000 });
-      return await loadImage(Buffer.from(res.data));
-    }
-  } catch (err) {
-    console.log("Profile image unavailable:", uid);
-  }
-  return null;
-}
-
-async function getGroupImage(threadID, api) {
-  try {
-    const info = await api.getThreadInfo(threadID);
-    if (info.imageSrc) {
-      const res = await axios.get(info.imageSrc, { responseType: "arraybuffer", timeout: 12000 });
-      return await loadImage(Buffer.from(res.data));
-    }
-  } catch (_) {}
-  return null;
-}
-
-
-// ========================================
-// DRAW HELPERS
-// ========================================
-
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-
-function circleImage(ctx, img, x, y, r) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.clip();
-  if (img) {
-    ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
-  } else {
-    ctx.fillStyle = "#222222";
-    ctx.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-  ctx.restore();
-}
-
-function fitText(ctx, text, maxWidth, size = 32) {
-  let current = size;
-  ctx.font = `bold ${current}px Arial`;
-  while (ctx.measureText(text).width > maxWidth && current > 15) {
-    current--;
-    ctx.font = `bold ${current}px Arial`;
-  }
-  return current;
-}
-
-function ordinal(n) {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
-
-// ========================================
-// WELCOME CARD GENERATOR
-// ========================================
-
-async function createWelcomeCard(data) {
-  const { userName, threadName, memberCount, inviterName, newUserID, inviterID, threadID, api } = data;
-
-  const W = 1400;
-  const H = 800;
-  const canvas = createCanvas(W, H);
-  const ctx = canvas.getContext("2d");
-
-  const design = randomDesign();
-
-  const [userImg, inviterImg, groupImg] = await Promise.all([
-    getProfile(newUserID, api),
-    inviterID ? getProfile(inviterID, api) : null,
-    getGroupImage(threadID, api)
-  ]);
-
-  const C = design.main;
-  const S = design.second;
-
-  // Background
-  ctx.fillStyle = design.bg;
-  ctx.fillRect(0, 0, W, H);
-
-  // Background glow
-  const glow = ctx.createRadialGradient(700, 400, 50, 700, 400, 800);
-  glow.addColorStop(0, C + "25");
-  glow.addColorStop(1, "#00000000");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, H);
-
-  // Stars effect
-  for (let i = 0; i < 180; i++) {
-    const x = Math.random() * W;
-    const y = Math.random() * H;
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.beginPath();
-    ctx.arc(x, y, Math.random() * 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Outer border with shadow
-  ctx.save();
-  ctx.shadowColor = design.glow;
-  ctx.shadowBlur = 20;
-  ctx.strokeStyle = C;
-  ctx.lineWidth = 4;
-  roundRect(ctx, 12, 12, W - 24, H - 24, 35);
-  ctx.stroke();
-  ctx.restore();
-
-  // Left panel
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  roundRect(ctx, 35, 35, 490, 730, 28);
-  ctx.fill();
-
-  // Right panel
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  roundRect(ctx, 550, 35, 815, 730, 28);
-  ctx.fill();
-
-  // New member heading
-  ctx.textAlign = "center";
-  ctx.fillStyle = C;
-  ctx.font = "bold 26px Arial";
-  ctx.fillText("✦ NEW MEMBER ✦", 280, 95);
-
-  // User avatar frame & glow
-  ctx.save();
-  ctx.shadowColor = design.glow;
-  ctx.shadowBlur = 35;
-  ctx.strokeStyle = C;
-  ctx.lineWidth = 9;
-  ctx.beginPath();
-  ctx.arc(280, 350, 180, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-
-  circleImage(ctx, userImg, 280, 350, 165);
-
-  // Crown emoji/icon above profile
-  ctx.font = "58px Arial";
-  ctx.fillStyle = C;
-  ctx.fillText("👑", 280, 155);
-
-  // User name
-  const nameSize = fitText(ctx, userName, 420, 38);
-  ctx.font = `bold ${nameSize}px Arial`;
-  ctx.fillStyle = S;
-  ctx.fillText(userName, 280, 575);
-
-  // Member ordinal number (e.g. 5th Member)
-  ctx.font = "bold 25px Arial";
-  ctx.fillStyle = C;
-  ctx.fillText(`✦ ${ordinal(memberCount)} MEMBER ✦`, 280, 640);
-
-  // Group Heading
-  ctx.textAlign = "left";
-  ctx.font = "bold 43px Arial";
-  ctx.fillStyle = S;
-  ctx.fillText("Welcome To Our Group", 600, 115);
-
-  // Group Name label
-  ctx.font = "bold 22px Arial";
-  ctx.fillStyle = C;
-  ctx.fillText("GROUP NAME", 600, 180);
-
-  // Group picture frame
-  ctx.save();
-  roundRect(ctx, 600, 205, 125, 125, 20);
-  ctx.clip();
-  if (groupImg) {
-    ctx.drawImage(groupImg, 600, 205, 125, 125);
-  } else {
-    ctx.fillStyle = "#222222";
-    ctx.fillRect(600, 205, 125, 125);
-  }
-  ctx.restore();
-
-  ctx.strokeStyle = C;
-  ctx.lineWidth = 3;
-  roundRect(ctx, 600, 205, 125, 125, 20);
-  ctx.stroke();
-
-  const groupSize = fitText(ctx, threadName, 560, 36);
-  ctx.font = `bold ${groupSize}px Arial`;
-  ctx.fillStyle = S;
-  ctx.fillText(threadName, 755, 275);
-
-  // Divider line
-  ctx.strokeStyle = C + "80";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(600, 365);
-  ctx.lineTo(1300, 365);
-  ctx.stroke();
-
-  // Added by section
-  ctx.font = "bold 23px Arial";
-  ctx.fillStyle = C;
-  ctx.fillText("ADDED BY", 600, 420);
-
-  circleImage(ctx, inviterImg, 665, 515, 65);
-  ctx.strokeStyle = C;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(665, 515, 70, 0, Math.PI * 2);
-  ctx.stroke();
-
-  const inviterSize = fitText(ctx, inviterName, 450, 32);
-  ctx.font = `bold ${inviterSize}px Arial`;
-  ctx.fillStyle = S;
-  ctx.fillText(inviterName, 770, 525);
-
-  // Welcome message box container
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
-  roundRect(ctx, 600, 620, 700, 75, 18);
-  ctx.fill();
-
-  ctx.textAlign = "center";
-  ctx.font = "bold 23px Arial";
-  ctx.fillStyle = S;
-  ctx.fillText("Glad to have you here! Enjoy your stay ✨", 950, 665);
-
-  // Owner branding (M SHORIF ULLAH)
-  ctx.textAlign = "right";
-  ctx.font = "bold 25px Arial";
-  ctx.fillStyle = C;
-  ctx.shadowColor = design.glow;
-  ctx.shadowBlur = 12;
-  ctx.fillText("👑 Powered By M SHORIF ULLAH", 1300, 735);
-  ctx.shadowBlur = 0;
-
-  // Legendary badge label if design is legendary
-  if (design.legendary) {
-    ctx.textAlign = "center";
-    ctx.font = "bold 22px Arial";
-    ctx.fillStyle = "#ffda55";
-    ctx.fillText("✦ LEGENDARY EDITION ✦", 950, 755);
-  }
-
-  // Save temporary image file
-  const filePath = path.join(__dirname, `welcome_${Date.now()}.png`);
-  await fs.writeFile(filePath, canvas.toBuffer("image/png"));
-
-  return filePath;
-          }
