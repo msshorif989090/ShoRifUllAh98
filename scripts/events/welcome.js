@@ -8,7 +8,7 @@ const axios = require("axios");
 module.exports = {
   config: {
     name: "welcome",
-    version: "9.0",
+    version: "9.1",
     author: "M SHORIF ULLAH",
     category: "events"
   },
@@ -117,118 +117,23 @@ module.exports = {
 
 
 // ========================================
-// 13 VIP DESIGNS
-// 8 NORMAL + 5 LEGENDARY
+// 13 VIP DESIGNS (Optimized)
 // ========================================
 
 const DESIGNS = [
-  {
-    name: "Gold Royal",
-    legendary: false,
-    bg: "#100c08",
-    main: "#d6a83d",
-    second: "#fff0a6",
-    glow: "#ffd700"
-  },
-  {
-    name: "Purple King",
-    legendary: false,
-    bg: "#10091d",
-    main: "#a66cff",
-    second: "#edcaff",
-    glow: "#b56cff"
-  },
-  {
-    name: "Neon Blue",
-    legendary: false,
-    bg: "#06111e",
-    main: "#29c7ff",
-    second: "#c4f4ff",
-    glow: "#00cfff"
-  },
-  {
-    name: "Pink Romantic",
-    legendary: false,
-    bg: "#1c0815",
-    main: "#ff73b7",
-    second: "#ffd4e9",
-    glow: "#ff4da6"
-  },
-  {
-    name: "Red Devil",
-    legendary: false,
-    bg: "#1a0709",
-    main: "#ff4545",
-    second: "#ffc0c0",
-    glow: "#ff2424"
-  },
-  {
-    name: "Emerald Green",
-    legendary: false,
-    bg: "#06150e",
-    main: "#28d68a",
-    second: "#c0ffe0",
-    glow: "#00ff99"
-  },
-  {
-    name: "Butterfly",
-    legendary: false,
-    bg: "#10091a",
-    main: "#c28aff",
-    second: "#f3d8ff",
-    glow: "#dc8aff"
-  },
-  {
-    name: "Black Luxury",
-    legendary: false,
-    bg: "#080808",
-    main: "#c5c5c5",
-    second: "#ffffff",
-    glow: "#aaaaaa"
-  },
-
-  // LEGENDARY DESIGNS
-
-  {
-    name: "Gold Emperor",
-    legendary: true,
-    bg: "#100b02",
-    main: "#ffca28",
-    second: "#fff3b0",
-    glow: "#ffb300"
-  },
-  {
-    name: "Diamond Royal",
-    legendary: true,
-    bg: "#06121c",
-    main: "#7eeaff",
-    second: "#ffffff",
-    glow: "#00d9ff"
-  },
-  {
-    name: "Black Emperor",
-    legendary: true,
-    bg: "#050505",
-    main: "#e7c66b",
-    second: "#ffffff",
-    glow: "#ffcc33"
-  },
-  {
-    name: "Galaxy Legend",
-    legendary: true,
-    bg: "#0b0620",
-    main: "#bd83ff",
-    second: "#e9d5ff",
-    glow: "#8c43ff"
-  },
-  {
-    name: "Crown Master",
-    legendary: true,
-    bg: "#150707",
-    main: "#ffb347",
-    second: "#ffe5a3",
-    glow: "#ff7b00"
-  }
+  { name: "Gold Royal", legendary: false, bg: "#100c08", main: "#d6a83d", second: "#fff0a6", glow: "#ffd700" },
+  { name: "Purple King", legendary: false, bg: "#10091d", main: "#a66cff", second: "#edcaff", glow: "#b56cff" },
+  { name: "Neon Blue", legendary: false, bg: "#06111e", main: "#29c7ff", second: "#c4f4ff", glow: "#00cfff" },
+  { name: "Pink Romantic", legendary: false, bg: "#1c0815", main: "#ff73b7", second: "#ffd4e9", glow: "#ff4da6" },
+  { name: "Red Devil", legendary: false, bg: "#1a0709", main: "#ff4545", second: "#ffc0c0", glow: "#ff2424" },
+  { name: "Emerald Green", legendary: false, bg: "#06150e", main: "#28d68a", second: "#c0ffe0", glow: "#00ff99" },
+  { name: "Butterfly", legendary: false, bg: "#10091a", main: "#c28aff", second: "#f3d8ff", glow: "#dc8aff" },
+  { name: "Black Luxury", legendary: false, bg: "#080808", main: "#c5c5c5", second: "#ffffff", glow: "#aaaaaa" },
+  { name: "Gold Emperor", legendary: true, bg: "#100b02", main: "#ffca28", second: "#fff3b0", glow: "#ffb300" },
+  { name: "Diamond Royal", legendary: true, bg: "#06121c", main: "#7eeaff", second: "#ffffff", glow: "#00d9ff" },
+  { name: "Black Emperor", legendary: true, bg: "#050505", main: "#e7c66b", second: "#ffffff", glow: "#ffcc33" },
+  { name: "Galaxy Legend", legendary: true, bg: "#0b0620", main: "#bd83ff", second: "#e9d5ff", glow: "#8c43ff" },
+  { name: "Crown Master", legendary: true, bg: "#150707", main: "#ffb347", second: "#ffe5a3", glow: "#ff7b00" }
 ];
 
 function randomDesign() {
@@ -237,44 +142,31 @@ function randomDesign() {
 
 
 // ========================================
-// PROFILE IMAGE
+// PROFILE & GROUP IMAGE FETCHERS
 // ========================================
 
 async function getProfile(uid, api) {
   try {
     const info = await api.getUserInfo([uid]);
     const url = info[uid]?.thumbSrc;
-
     if (url) {
-      const res = await axios.get(url, {
-        responseType: "arraybuffer",
-        timeout: 12000
-      });
-
+      const res = await axios.get(url, { responseType: "arraybuffer", timeout: 12000 });
       return await loadImage(Buffer.from(res.data));
     }
   } catch (err) {
     console.log("Profile image unavailable:", uid);
   }
-
   return null;
 }
-
 
 async function getGroupImage(threadID, api) {
   try {
     const info = await api.getThreadInfo(threadID);
-
     if (info.imageSrc) {
-      const res = await axios.get(info.imageSrc, {
-        responseType: "arraybuffer",
-        timeout: 12000
-      });
-
+      const res = await axios.get(info.imageSrc, { responseType: "arraybuffer", timeout: 12000 });
       return await loadImage(Buffer.from(res.data));
     }
   } catch (_) {}
-
   return null;
 }
 
@@ -297,68 +189,46 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-
 function circleImage(ctx, img, x, y, r) {
   ctx.save();
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.clip();
-
   if (img) {
     ctx.drawImage(img, x - r, y - r, r * 2, r * 2);
   } else {
     ctx.fillStyle = "#222222";
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
   }
-
   ctx.restore();
 }
 
-
 function fitText(ctx, text, maxWidth, size = 32) {
   let current = size;
-
   ctx.font = `bold ${current}px Arial`;
-
-  while (
-    ctx.measureText(text).width > maxWidth &&
-    current > 15
-  ) {
+  while (ctx.measureText(text).width > maxWidth && current > 15) {
     current--;
     ctx.font = `bold ${current}px Arial`;
   }
-
   return current;
 }
-
 
 function ordinal(n) {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
-
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
 
 // ========================================
-// WELCOME CARD
+// WELCOME CARD GENERATOR
 // ========================================
 
 async function createWelcomeCard(data) {
-  const {
-    userName,
-    threadName,
-    memberCount,
-    inviterName,
-    newUserID,
-    inviterID,
-    threadID,
-    api
-  } = data;
+  const { userName, threadName, memberCount, inviterName, newUserID, inviterID, threadID, api } = data;
 
   const W = 1400;
   const H = 800;
-
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext("2d");
 
@@ -378,29 +248,23 @@ async function createWelcomeCard(data) {
   ctx.fillRect(0, 0, W, H);
 
   // Background glow
-  const glow = ctx.createRadialGradient(
-    700, 400, 50,
-    700, 400, 800
-  );
-
+  const glow = ctx.createRadialGradient(700, 400, 50, 700, 400, 800);
   glow.addColorStop(0, C + "25");
   glow.addColorStop(1, "#00000000");
-
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
 
-  // Stars
+  // Stars effect
   for (let i = 0; i < 180; i++) {
     const x = Math.random() * W;
     const y = Math.random() * H;
-
     ctx.fillStyle = "rgba(255,255,255,0.35)";
     ctx.beginPath();
     ctx.arc(x, y, Math.random() * 2, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Outer border
+  // Outer border with shadow
   ctx.save();
   ctx.shadowColor = design.glow;
   ctx.shadowBlur = 20;
@@ -426,7 +290,7 @@ async function createWelcomeCard(data) {
   ctx.font = "bold 26px Arial";
   ctx.fillText("✦ NEW MEMBER ✦", 280, 95);
 
-  // User avatar frame
+  // User avatar frame & glow
   ctx.save();
   ctx.shadowColor = design.glow;
   ctx.shadowBlur = 35;
@@ -439,50 +303,43 @@ async function createWelcomeCard(data) {
 
   circleImage(ctx, userImg, 280, 350, 165);
 
-  // Crown
+  // Crown emoji/icon above profile
   ctx.font = "58px Arial";
   ctx.fillStyle = C;
   ctx.fillText("👑", 280, 155);
 
   // User name
   const nameSize = fitText(ctx, userName, 420, 38);
-
   ctx.font = `bold ${nameSize}px Arial`;
   ctx.fillStyle = S;
   ctx.fillText(userName, 280, 575);
 
-  // Member number
+  // Member ordinal number (e.g. 5th Member)
   ctx.font = "bold 25px Arial";
   ctx.fillStyle = C;
-  ctx.fillText(
-    `✦ ${ordinal(memberCount)} MEMBER ✦`,
-    280,
-    640
-  );
+  ctx.fillText(`✦ ${ordinal(memberCount)} MEMBER ✦`, 280, 640);
 
-  // Group heading
+  // Group Heading
   ctx.textAlign = "left";
   ctx.font = "bold 43px Arial";
   ctx.fillStyle = S;
   ctx.fillText("Welcome To Our Group", 600, 115);
 
-  // Group name
+  // Group Name label
   ctx.font = "bold 22px Arial";
   ctx.fillStyle = C;
   ctx.fillText("GROUP NAME", 600, 180);
 
-  // Group picture
+  // Group picture frame
   ctx.save();
   roundRect(ctx, 600, 205, 125, 125, 20);
   ctx.clip();
-
   if (groupImg) {
     ctx.drawImage(groupImg, 600, 205, 125, 125);
   } else {
     ctx.fillStyle = "#222222";
     ctx.fillRect(600, 205, 125, 125);
   }
-
   ctx.restore();
 
   ctx.strokeStyle = C;
@@ -491,12 +348,11 @@ async function createWelcomeCard(data) {
   ctx.stroke();
 
   const groupSize = fitText(ctx, threadName, 560, 36);
-
   ctx.font = `bold ${groupSize}px Arial`;
   ctx.fillStyle = S;
   ctx.fillText(threadName, 755, 275);
 
-  // Divider
+  // Divider line
   ctx.strokeStyle = C + "80";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -504,14 +360,12 @@ async function createWelcomeCard(data) {
   ctx.lineTo(1300, 365);
   ctx.stroke();
 
-  // Added by
+  // Added by section
   ctx.font = "bold 23px Arial";
   ctx.fillStyle = C;
   ctx.fillText("ADDED BY", 600, 420);
 
-  // Inviter picture
   circleImage(ctx, inviterImg, 665, 515, 65);
-
   ctx.strokeStyle = C;
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -519,12 +373,11 @@ async function createWelcomeCard(data) {
   ctx.stroke();
 
   const inviterSize = fitText(ctx, inviterName, 450, 32);
-
   ctx.font = `bold ${inviterSize}px Arial`;
   ctx.fillStyle = S;
   ctx.fillText(inviterName, 770, 525);
 
-  // Welcome message
+  // Welcome message box container
   ctx.fillStyle = "rgba(255,255,255,0.06)";
   roundRect(ctx, 600, 620, 700, 75, 18);
   ctx.fill();
@@ -532,28 +385,18 @@ async function createWelcomeCard(data) {
   ctx.textAlign = "center";
   ctx.font = "bold 23px Arial";
   ctx.fillStyle = S;
-  ctx.fillText(
-    "Glad to have you here! Enjoy your stay ✨",
-    950,
-    665
-  );
+  ctx.fillText("Glad to have you here! Enjoy your stay ✨", 950, 665);
 
-  // Owner branding
+  // Owner branding (M SHORIF ULLAH)
   ctx.textAlign = "right";
   ctx.font = "bold 25px Arial";
   ctx.fillStyle = C;
   ctx.shadowColor = design.glow;
   ctx.shadowBlur = 12;
-
-  ctx.fillText(
-    "👑 Powered By M SHORIF ULLAH",
-    1300,
-    735
-  );
-
+  ctx.fillText("👑 Powered By M SHORIF ULLAH", 1300, 735);
   ctx.shadowBlur = 0;
 
-  // Legendary badge
+  // Legendary badge label if design is legendary
   if (design.legendary) {
     ctx.textAlign = "center";
     ctx.font = "bold 22px Arial";
@@ -561,16 +404,9 @@ async function createWelcomeCard(data) {
     ctx.fillText("✦ LEGENDARY EDITION ✦", 950, 755);
   }
 
-  // Save image
-  const filePath = path.join(
-    __dirname,
-    `welcome_${Date.now()}.png`
-  );
-
-  await fs.writeFile(
-    filePath,
-    canvas.toBuffer("image/png")
-  );
+  // Save temporary image file
+  const filePath = path.join(__dirname, `welcome_${Date.now()}.png`);
+  await fs.writeFile(filePath, canvas.toBuffer("image/png"));
 
   return filePath;
-    }
+          }
