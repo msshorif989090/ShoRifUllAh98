@@ -1,127 +1,80 @@
 /**
- * GoatBot V2 Welcome Event
- * 6 Random Premium Color Themes
- * Original Card Design + Framework Features
+ * GoatBot V2 Premium Welcome
+ * 8 Random Colour Themes
+ * Size: 1400 x 1500
+ * Member + Admin Name and Profile Picture
+ * Powered By Shorif Ullah
  */
-
-const { drive } = global.utils || {};
-const nickNameBot = global.GoatBot?.config?.nickNameBot;
 
 const { createCanvas, loadImage } = require("canvas");
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
 
-// ========================================
-// 6 PREMIUM COLOR THEMES
-// ========================================
+const WIDTH = 1400;
+const HEIGHT = 1500;
+const TEMP_DIR = path.join(__dirname, "cache", "welcome");
 
 const THEMES = [
-  {
-    name: "ELECTRIC BLUE",
-    bg1: "#06152f",
-    bg2: "#0877d8",
-    accent: "#42d8ff",
-    light: "#b9f4ff",
-    panel: "rgba(4,23,52,.84)"
-  },
-  {
-    name: "ROYAL PURPLE",
-    bg1: "#190b35",
-    bg2: "#7136c9",
-    accent: "#d5a6ff",
-    light: "#f1d8ff",
-    panel: "rgba(31,10,57,.85)"
-  },
-  {
-    name: "EMERALD GREEN",
-    bg1: "#042b25",
-    bg2: "#079b70",
-    accent: "#57ffd0",
-    light: "#c6ffeb",
-    panel: "rgba(2,39,32,.85)"
-  },
-  {
-    name: "CRIMSON RED",
-    bg1: "#300815",
-    bg2: "#c32645",
-    accent: "#ff718b",
-    light: "#ffd0d9",
-    panel: "rgba(48,5,22,.85)"
-  },
-  {
-    name: "ROYAL GOLD",
-    bg1: "#281a05",
-    bg2: "#a97919",
-    accent: "#ffdc72",
-    light: "#fff0bb",
-    panel: "rgba(43,27,4,.87)"
-  },
-  {
-    name: "NEON CYAN",
-    bg1: "#03252d",
-    bg2: "#078da0",
-    accent: "#52f5ff",
-    light: "#c5ffff",
-    panel: "rgba(1,35,43,.86)"
-  }
+  { name: "Royal Purple", main: "#c026ff", light: "#f0aaff", dark: "#160020", accent: "#ffd84a" },
+  { name: "Electric Blue", main: "#078cff", light: "#8be7ff", dark: "#00142b", accent: "#ffe34d" },
+  { name: "Crimson Red", main: "#ff263e", light: "#ff9aa5", dark: "#260006", accent: "#ffd34d" },
+  { name: "Emerald Green", main: "#16e66a", light: "#a5ffc4", dark: "#001b0b", accent: "#ffe34d" },
+  { name: "Royal Gold", main: "#ffbf16", light: "#fff0a0", dark: "#241600", accent: "#fff1a6" },
+  { name: "Neon Cyan", main: "#00dfff", light: "#a5f8ff", dark: "#001c25", accent: "#ffe34d" },
+  { name: "Hot Pink", main: "#ff27bb", light: "#ffb0e8", dark: "#26001b", accent: "#ffe34d" },
+  { name: "Sunset Orange", main: "#ff7418", light: "#ffd09b", dark: "#281000", accent: "#fff0a0" }
 ];
 
-const SETTINGS = {
-  width: 1200,
-  height: 650,
+function safeText(value, fallback = "Unknown") {
+  if (!value) return fallback;
+  return String(value).replace(/[\r\n]+/g, " ").slice(0, 70);
+}
 
-  welcomeText: "WELCOME TO OUR FAMILY",
-
-  message: "👑 Welcome {userName}!\n✨ Welcome to {threadName}\n🎉 You are our {memberCount} member!\n💎 Enjoy your stay!",
-
-  footer: "👑 Powered By M SHORIF ULLAH 👑",
-
-  sendText: true,
-
-  cacheDir: path.join(__dirname, "cache", "welcome")
-};
-
-// ========================================
-// HELPERS
-// ========================================
-
-const randomTheme = () =>
-  THEMES[Math.floor(Math.random() * THEMES.length)];
-
-const clean = (v, fallback = "Unknown") =>
-  String(v || fallback).replace(/[<>]/g, "").trim();
-
-async function downloadImage(url, file) {
-  if (!url) return null;
+async function getProfile(userID, api) {
+  if (!userID) return null;
 
   try {
-    const res = await axios.get(url, {
-      responseType: "arraybuffer",
-      timeout: 15000,
-      headers: {
-        "User-Agent": "Mozilla/5.0"
-      }
-    });
+    const info = await api.getUserInfo(userID);
+    const user = info && info[userID];
 
-    await fs.ensureDir(path.dirname(file));
-    await fs.writeFile(file, res.data);
-
-    return file;
-  } catch (_) {
+    return user && (
+      user.thumbSrc ||
+      user.profileUrl ||
+      user.photoUrl ||
+      user.image ||
+      null
+    );
+  } catch (e) {
     return null;
   }
 }
 
-function rounded(ctx, x, y, w, h, r, fill, stroke, line = 2) {
-  ctx.beginPath();
+async function downloadImage(url, filePath) {
+  if (!url) return null;
 
+  try {
+    const response = await axios.get(url, {
+      responseType: "arraybuffer",
+      timeout: 15000
+    });
+
+    await fs.ensureDir(path.dirname(filePath));
+    await fs.writeFile(filePath, Buffer.from(response.data));
+
+    return filePath;
+  } catch (e) {
+    return null;
+  }
+}
+
+function roundedRect(ctx, x, y, w, h, r, fill, stroke) {
+  ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
   ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
-
   ctx.closePath();
 
   if (fill) {
@@ -130,589 +83,319 @@ function rounded(ctx, x, y, w, h, r, fill, stroke, line = 2) {
   }
 
   if (stroke) {
+    ctx.lineWidth = 5;
     ctx.strokeStyle = stroke;
-    ctx.lineWidth = line;
     ctx.stroke();
   }
 }
 
-function cover(ctx, img, x, y, w, h) {
-  const scale = Math.max(
-    w / img.width,
-    h / img.height
-  );
-
-  const sw = w / scale;
-  const sh = h / scale;
-
-  ctx.drawImage(
-    img,
-    (img.width - sw) / 2,
-    (img.height - sh) / 2,
-    sw,
-    sh,
-    x,
-    y,
-    w,
-    h
-  );
+function glowText(ctx, text, x, y, size, color, align = "center", font = "bold") {
+  ctx.save();
+  ctx.textAlign = align;
+  ctx.font = `${font} ${size}px sans-serif`;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = color;
+  ctx.fillText(String(text), x, y, 1250);
+  ctx.restore();
 }
 
-function avatar(ctx, img, x, y, size, accent) {
+async function drawAvatar(ctx, imagePath, x, y, size, theme) {
   ctx.save();
-
-  ctx.shadowColor = accent;
-  ctx.shadowBlur = 22;
-
   ctx.beginPath();
-
-  ctx.arc(
-    x + size / 2,
-    y + size / 2,
-    size / 2 + 7,
-    0,
-    Math.PI * 2
-  );
-
-  ctx.fillStyle = accent;
-  ctx.fill();
-
-  ctx.restore();
-
-  ctx.save();
-
-  ctx.beginPath();
-
-  ctx.arc(
-    x + size / 2,
-    y + size / 2,
-    size / 2,
-    0,
-    Math.PI * 2
-  );
-
+  ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
   ctx.clip();
 
-  if (img) {
-    cover(ctx, img, x, y, size, size);
+  if (imagePath) {
+    try {
+      const img = await loadImage(imagePath);
+      const scale = Math.max(size / img.width, size / img.height);
+      const sw = size / scale;
+      const sh = size / scale;
+
+      ctx.drawImage(
+        img,
+        (img.width - sw) / 2,
+        (img.height - sh) / 2,
+        sw,
+        sh,
+        x,
+        y,
+        size,
+        size
+      );
+    } catch (e) {
+      ctx.fillStyle = "#202638";
+      ctx.fillRect(x, y, size, size);
+    }
   } else {
-    ctx.fillStyle = "#26364d";
+    ctx.fillStyle = "#202638";
     ctx.fillRect(x, y, size, size);
-
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 60px Arial";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 80px sans-serif";
     ctx.textAlign = "center";
-
-    ctx.fillText(
-      "?",
-      x + size / 2,
-      y + size / 2 + 20
-    );
+    ctx.fillText("?", x + size / 2, y + size / 1.6);
   }
 
   ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x + size / 2, y + size / 2, size / 2 + 5, 0, Math.PI * 2);
+  ctx.strokeStyle = theme.main;
+  ctx.lineWidth = 8;
+  ctx.shadowColor = theme.main;
+  ctx.shadowBlur = 22;
+  ctx.stroke();
+  ctx.restore();
 }
 
-function fit(ctx, text, max, initial) {
-  let size = initial;
+async function createWelcomeCard(data, memberPath, adminPath) {
+  const theme = THEMES[Math.floor(Math.random() * THEMES.length)];
 
-  do {
-    ctx.font = `bold ${size}px Arial`;
+  const canvas = createCanvas(WIDTH, HEIGHT);
+  const ctx = canvas.getContext("2d");
 
-    if (
-      ctx.measureText(text).width <= max ||
-      size <= 22
-    ) {
-      break;
-    }
+  const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+  bg.addColorStop(0, "#03030a");
+  bg.addColorStop(0.5, theme.dark);
+  bg.addColorStop(1, "#03030a");
 
-    size -= 2;
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  } while (size > 20);
+  ctx.save();
+  ctx.strokeStyle = theme.main;
+  ctx.lineWidth = 5;
+  ctx.shadowColor = theme.main;
+  ctx.shadowBlur = 28;
+  ctx.strokeRect(18, 18, WIDTH - 36, HEIGHT - 36);
+  ctx.restore();
 
-  return size;
-}
+  for (let i = 0; i < 42; i++) {
+    const x = (i * 173) % WIDTH;
+    const y = (i * 257) % HEIGHT;
 
-// ========================================
-// PROFILE IMAGE
-// ========================================
-
-async function getProfile(uid, api) {
-  try {
-    const info = await api.getUserInfo([uid]);
-    const user = info[uid] || {};
-
-    return (
-      user.thumbSrc ||
-      user.profileUrl ||
-      user.photoUrl ||
-      null
-    );
-  } catch (_) {
-    return null;
+    ctx.fillStyle = theme.light;
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.arc(x, y, 2 + (i % 3), 0, Math.PI * 2);
+    ctx.fill();
   }
-}
 
-// ========================================
-// WELCOME CARD GENERATOR
-// ========================================
+  ctx.globalAlpha = 1;
 
-async function buildCard(info) {
-  const theme = randomTheme();
+  glowText(ctx, "New Journey Begins...", 75, 95, 40, theme.light, "left", "italic");
+  glowText(ctx, "Together We Grow Stronger", WIDTH - 75, 95, 38, theme.light, "right", "italic");
 
-  const W = SETTINGS.width;
-  const H = SETTINGS.height;
-  const dir = SETTINGS.cacheDir;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(WIDTH / 2, 340, 205, 0, Math.PI * 2);
+  ctx.strokeStyle = theme.main;
+  ctx.lineWidth = 16;
+  ctx.shadowColor = theme.main;
+  ctx.shadowBlur = 35;
+  ctx.stroke();
+  ctx.restore();
 
-  const stamp =
-    `${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+  await drawAvatar(ctx, memberPath, WIDTH / 2 - 185, 155, 370, theme);
 
-  const files = await Promise.all([
-    downloadImage(
-      info.memberURL,
-      path.join(dir, `member-${stamp}.jpg`)
-    ),
+  glowText(ctx, "♛", WIDTH / 2, 135, 105, theme.accent);
 
-    downloadImage(
-      info.groupURL,
-      path.join(dir, `group-${stamp}.jpg`)
-    ),
+  glowText(ctx, "WELCOME", WIDTH / 2, 655, 145, theme.light);
+  glowText(ctx, "to our Group ♡", WIDTH / 2, 725, 62, theme.main, "center", "italic");
 
-    downloadImage(
-      info.adderURL,
-      path.join(dir, `adder-${stamp}.jpg`)
-    )
-  ]);
+  // Member and Admin information
+  roundedRect(ctx, 70, 775, 1260, 205, 38, "rgba(3,8,22,0.92)", theme.main);
 
-  try {
-    const imgs = await Promise.all(
-      files.map(async f => {
-        try {
-          return f ? await loadImage(f) : null;
-        } catch (_) {
-          return null;
-        }
-      })
-    );
+  await drawAvatar(ctx, memberPath, 105, 815, 125, theme);
 
-    const [memberImg, groupImg, adderImg] = imgs;
+  glowText(ctx, "NEW MEMBER", 265, 855, 34, theme.main, "left");
+  glowText(ctx, data.memberName, 265, 920, 48, "#ffffff", "left");
 
-    const canvas = createCanvas(W, H);
-    const ctx = canvas.getContext("2d");
+  ctx.save();
+  ctx.strokeStyle = theme.main;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(700, 800);
+  ctx.lineTo(700, 955);
+  ctx.stroke();
+  ctx.restore();
 
-    // Background
-    const gradient = ctx.createLinearGradient(
-      0, 0, W, H
-    );
+  await drawAvatar(ctx, adminPath, 755, 815, 125, theme);
 
-    gradient.addColorStop(0, theme.bg1);
-    gradient.addColorStop(1, theme.bg2);
+  glowText(ctx, "ADDED BY", 915, 855, 34, theme.main, "left");
+  glowText(ctx, data.adminName, 915, 920, 48, "#ffffff", "left");
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, W, H);
+  // Group details
+  roundedRect(ctx, 105, 1010, 1190, 330, 34, "rgba(3,8,22,0.94)", theme.main);
 
-    // Decorative lines
-    ctx.save();
+  const rows = [
+    ["GROUP NAME", data.groupName],
+    ["MEMBER NO.", data.memberCount],
+    ["JOINED AT", data.joinedAt]
+  ];
 
-    ctx.globalAlpha = 0.12;
-    ctx.strokeStyle = theme.accent;
-    ctx.lineWidth = 2;
+  const rowY = [1090, 1190, 1290];
 
-    for (let i = -H; i < W; i += 48) {
+  rows.forEach((row, i) => {
+    if (i > 0) {
+      ctx.save();
+      ctx.strokeStyle = theme.main;
+      ctx.globalAlpha = 0.65;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i + H, H);
+      ctx.moveTo(145, rowY[i] - 52);
+      ctx.lineTo(1255, rowY[i] - 52);
       ctx.stroke();
+      ctx.restore();
     }
 
-    ctx.restore();
+    glowText(ctx, row[0], 180, rowY[i] - 12, 29, theme.main, "left");
+    glowText(ctx, row[1], 180, rowY[i] + 32, 43, "#ffffff", "left");
+  });
 
-    // Card frame
-    rounded(
-      ctx,
-      24, 24,
-      W - 48,
-      H - 48,
-      34,
-      "rgba(0,0,0,.10)",
-      theme.accent,
-      4
-    );
+  glowText(ctx, "★ ENJOY YOUR STAY! ★", WIDTH / 2, 1410, 42, theme.light, "center", "italic");
+  glowText(ctx, "Powered By Shorif Ullah", WIDTH / 2, 1470, 42, theme.accent, "center", "italic");
 
-    rounded(
-      ctx,
-      43, 43,
-      W - 86,
-      H - 86,
-      27,
-      theme.panel,
-      "rgba(255,255,255,.2)",
-      2
-    );
-
-    // Header
-    ctx.textAlign = "center";
-    ctx.shadowColor = theme.accent;
-    ctx.shadowBlur = 20;
-
-    ctx.fillStyle = theme.light;
-    ctx.font = "bold 54px Arial";
-
-    ctx.fillText(
-      SETTINGS.welcomeText,
-      W / 2,
-      120
-    );
-
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = "#fff";
-    ctx.font = "24px Arial";
-
-    ctx.fillText(
-      "WE ARE HAPPY TO HAVE YOU HERE",
-      W / 2,
-      160
-    );
-
-    // Member avatar
-    avatar(
-      ctx,
-      memberImg,
-      105,
-      205,
-      210,
-      theme.accent
-    );
-
-    // Member name
-    ctx.textAlign = "left";
-
-    ctx.fillStyle = theme.light;
-    ctx.font = "bold 25px Arial";
-
-    ctx.fillText(
-      "NEW MEMBER",
-      365,
-      250
-    );
-
-    ctx.font =
-      `bold ${fit(ctx, info.memberName, 720, 48)}px Arial`;
-
-    ctx.fillStyle = "#fff";
-
-    ctx.fillText(
-      info.memberName,
-      365,
-      315
-    );
-
-    // Member number
-    ctx.fillStyle = theme.accent;
-    ctx.font = "bold 30px Arial";
-
-    ctx.fillText(
-      `MEMBER NO. ${info.memberCount}`,
-      365,
-      370
-    );
-
-    // Group panel
-    rounded(
-      ctx,
-      350, 405,
-      740, 105,
-      20,
-      "rgba(255,255,255,.08)",
-      "rgba(255,255,255,.2)",
-      2
-    );
-
-    avatar(
-      ctx,
-      groupImg,
-      377,
-      419,
-      76,
-      theme.accent
-    );
-
-    ctx.fillStyle = theme.light;
-    ctx.font = "bold 20px Arial";
-
-    ctx.fillText("GROUP", 480, 447);
-
-    ctx.font =
-      `bold ${fit(ctx, info.groupName, 590, 30)}px Arial`;
-
-    ctx.fillStyle = "#fff";
-
-    ctx.fillText(
-      info.groupName,
-      480,
-      483
-    );
-
-    // Added by
-    avatar(
-      ctx,
-      adderImg,
-      105,
-      455,
-      78,
-      theme.accent
-    );
-
-    ctx.fillStyle = theme.light;
-    ctx.font = "bold 18px Arial";
-
-    ctx.fillText("ADDED BY", 205, 480);
-
-    ctx.fillStyle = "#fff";
-
-    ctx.font =
-      `bold ${fit(ctx, info.adderName, 130, 23)}px Arial`;
-
-    ctx.fillText(
-      info.adderName,
-      205,
-      510
-    );
-
-    // Footer
-    ctx.textAlign = "center";
-    ctx.fillStyle = theme.accent;
-    ctx.font = "bold 21px Arial";
-
-    ctx.fillText(
-      SETTINGS.footer,
-      W / 2,
-      585
-    );
-
-    await fs.ensureDir(dir);
-
-    const output = path.join(
-      dir,
-      `welcome-${stamp}.png`
-    );
-
-    await fs.writeFile(
-      output,
-      canvas.toBuffer("image/png")
-    );
-
-    return {
-      output,
-      theme
-    };
-
-  } finally {
-    for (const f of files) {
-      if (f) {
-        await fs.remove(f).catch(() => {});
-      }
-    }
-  }
+  return canvas.toBuffer("image/png");
 }
-
-// ========================================
-// GOATBOT WELCOME EVENT
-// ========================================
 
 module.exports = {
   config: {
     name: "welcome",
-    version: "10.0",
-    author: "M SHORIF ULLAH",
-    category: "events"
-  },
-
-  langs: {
-    en: {
-      botAddedMessage:
-        "👑 Thanks for adding me to your group!\n⚙️ Type /help to see commands."
+    eventType: ["log:subscribe"],
+    version: "11.0.0",
+    credits: "Shorif Ullah",
+    description: "Premium welcome card with 8 random colours",
+    category: "events",
+    dependencies: {
+      canvas: "",
+      axios: "",
+      "fs-extra": ""
     }
   },
 
-  onStart: async function ({
-    threadsData,
-    message,
-    event,
-    api,
-    usersData,
-    getLang
-  }) {
-    if (event.logMessageType !== "log:subscribe") {
-      return;
-    }
+  onStart: async function ({ api, event, threadsData, usersData, message }) {
+    if (event.logMessageType !== "log:subscribe") return;
 
-    const { threadID } = event;
+    const threadID = event.threadID;
+    const addedUsers = event.logMessageData?.addedParticipants;
 
-    const threadData = await threadsData.get(threadID);
+    if (!Array.isArray(addedUsers) || addedUsers.length === 0) return;
 
-    if (!threadData.settings?.sendWelcomeMessage) {
-      return;
-    }
-
-    const addedMembers =
-      event.logMessageData?.addedParticipants || [];
-
-    if (!addedMembers.length) return;
-
-    const threadName = clean(
-      threadData.threadName,
-      "Our Group"
-    );
-
-    const inviterID = event.author;
-    const botID = api.getCurrentUserID();
-
-    let threadInfo = {};
+    let threadInfo;
 
     try {
       threadInfo = await api.getThreadInfo(threadID);
-    } catch (err) {
-      console.log("Thread info unavailable:", err.message);
+    } catch (e) {
+      console.error("[welcome] Cannot get thread info:", e);
+      return;
     }
 
-    const groupURL =
-      threadInfo.imageSrc ||
-      threadInfo.image ||
-      null;
+    let threadData = null;
 
-    for (const user of addedMembers) {
-      const userID = user.userFbId || user.id;
-
-      if (!userID) continue;
-
-      // Bot added to group
-      if (String(userID) === String(botID)) {
-        if (nickNameBot) {
-          try {
-            await api.changeNickname(
-              nickNameBot,
-              threadID,
-              botID
-            );
-          } catch (err) {
-            console.log("Nickname Error:", err.message);
-          }
-        }
-
-        const botMessage = getLang
-          ? getLang("botAddedMessage")
-          : "👑 Thanks for adding me to your group!\n⚙️ Type /help to see commands.";
-
-        await message.send(botMessage);
-        continue;
+    try {
+      if (threadsData && typeof threadsData.get === "function") {
+        threadData = await threadsData.get(threadID);
       }
+    } catch (e) {}
 
-      const userInfo = await api.getUserInfo([userID]);
-      const memberData = userInfo[userID] || {};
+    if (
+      threadData &&
+      threadData.settings &&
+      threadData.settings.sendWelcomeMessage === false
+    ) return;
 
-      const userName = clean(
-        user.fullName || memberData.name,
-        "New Member"
+    const groupName = safeText(threadInfo.threadName, "Our Group");
+
+    const participants = Array.isArray(threadInfo.participantIDs)
+      ? threadInfo.participantIDs.length
+      : 0;
+
+    const joinedAt = new Date().toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    });
+
+    const adminID = event.author || null;
+    let adminName = "Group Admin";
+
+    if (adminID) {
+      try {
+        adminName = await usersData.getName(adminID);
+      } catch (e) {
+        try {
+          const info = await api.getUserInfo(adminID);
+          adminName = info?.[adminID]?.name || "Group Admin";
+        } catch (err) {}
+      }
+    }
+
+    await fs.ensureDir(TEMP_DIR);
+
+    for (const participant of addedUsers) {
+      const memberID = participant.userFbId || participant.id;
+      if (!memberID) continue;
+
+      let memberName = safeText(participant.fullName, "New Member");
+
+      try {
+        if (usersData && typeof usersData.getName === "function") {
+          memberName = safeText(await usersData.getName(memberID), memberName);
+        }
+      } catch (e) {}
+
+      const memberURL = await getProfile(memberID, api);
+      const adminURL = await getProfile(adminID, api);
+
+      const stamp = `${Date.now()}_${String(memberID)}`;
+
+      const memberPath = await downloadImage(
+        memberURL,
+        path.join(TEMP_DIR, `member_${stamp}.jpg`)
       );
 
-      let inviterName = "Group Admin";
+      const adminPath = await downloadImage(
+        adminURL,
+        path.join(TEMP_DIR, `admin_${stamp}.jpg`)
+      );
 
       try {
-        if (inviterID) {
-          inviterName = await usersData.getName(inviterID);
-        }
-      } catch (_) {}
+        const imageBuffer = await createWelcomeCard({
+          memberName,
+          adminName: safeText(adminName, "Group Admin"),
+          groupName,
+          memberCount: String(participants),
+          joinedAt
+        }, memberPath, adminPath);
 
-      let adderURL = null;
+        const caption =
+          `Welcome ${memberName} to ${groupName}!\n` +
+          `Added by: ${safeText(adminName, "Group Admin")}\n` +
+          `Powered By Shorif Ullah`;
 
-      if (inviterID) {
-        adderURL = await getProfile(inviterID, api);
-      }
-
-      const memberURL =
-        memberData.thumbSrc ||
-        memberData.profileUrl ||
-        memberData.photoUrl ||
-        null;
-
-      let memberCount =
-        Array.isArray(event.participantIDs)
-          ? event.participantIDs.length
-          : Array.isArray(threadInfo.participantIDs)
-            ? threadInfo.participantIDs.length
-            : "—";
-
-      const welcomeMessage =
-        threadData.data?.welcomeMessage ||
-        SETTINGS.message;
-
-      const finalMessage = welcomeMessage
-        .replace(/\{userName\}/g, userName)
-        .replace(/\{userTag\}/g, userName)
-        .replace(/\{threadName\}/g, threadName)
-        .replace(/\{memberCount\}/g, String(memberCount))
-        .replace(/\{inviterName\}/g, inviterName);
-
-      let welcomeImagePath = null;
-
-      try {
-        const result = await buildCard({
-          memberName: userName,
-          groupName: threadName,
-          memberCount,
-          adderName: inviterName,
-          memberURL,
-          groupURL,
-          adderURL
+        await message.send({
+          body: caption,
+          attachment: imageBuffer
         });
 
-        welcomeImagePath = result.output;
+      } catch (e) {
+        console.error("[welcome] Card creation/send failed:", e);
 
-      } catch (err) {
-        console.error("Welcome Card Error:", err);
-      }
+        try {
+          await message.send(
+            `Welcome ${memberName} to ${groupName}!\nAdded by: ${safeText(adminName, "Group Admin")}`
+          );
+        } catch (err) {}
 
-      const form = {
-        body: SETTINGS.sendText ? finalMessage : "",
-        mentions: [
-          {
-            tag: userName,
-            id: userID
-          }
-        ]
-      };
-
-      if (
-        welcomeImagePath &&
-        await fs.pathExists(welcomeImagePath)
-      ) {
-        form.attachment =
-          fs.createReadStream(welcomeImagePath);
-
-      } else if (
-        Array.isArray(threadData.data?.welcomeAttachment) &&
-        drive?.getFile
-      ) {
-        const attachments = threadData.data.welcomeAttachment
-          .map(f => drive.getFile(f, "stream"));
-
-        const results = await Promise.allSettled(attachments);
-
-        form.attachment = results
-          .filter(x => x.status === "fulfilled")
-          .map(x => x.value);
-      }
-
-      try {
-        await message.send(form);
       } finally {
-        if (welcomeImagePath) {
-          setTimeout(() => {
-            fs.remove(welcomeImagePath).catch(() => {});
-          }, 10000);
-        }
+        if (memberPath) await fs.remove(memberPath).catch(() => {});
+        if (adminPath) await fs.remove(adminPath).catch(() => {});
       }
     }
   }
