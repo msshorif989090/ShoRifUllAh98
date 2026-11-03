@@ -1,44 +1,64 @@
-const { getTime } = global.utils;
+const fs = require("fs");
+const path = require("path");
 
 module.exports = {
   config: {
     name: "antileave",
-    version: "2.5",
-    author: "EryXenX",
+    version: "3.0",
+    author: "Shorif Ullah",
     category: "events"
   },
 
-  onStart: async ({ api, event, usersData, message }) => {
+  onStart: async ({ api, event, usersData }) => {
     if (event.logMessageType !== "log:unsubscribe") return;
 
     const { threadID, logMessageData, author } = event;
     const leftID = logMessageData.leftParticipantFbId;
 
-    if (leftID === author) {
+    if (leftID !== author) return;
+
+    try {
       const userName = await usersData.getName(leftID);
+      const threadInfo = await api.getThreadInfo(threadID);
+      const groupName = threadInfo.threadName || "আমাদের ফ্যামিলি";
 
-      const boldMap = {
-        A: "𝗔", B: "𝗕", C: "𝗖", D: "𝗗", E: "𝗘", F: "𝗙", G: "𝗚", H: "𝗛", I: "𝗜", J: "𝗝",
-        K: "𝗞", L: "𝗟", M: "𝗠", N: "𝗡", O: "𝗢", P: "𝗣", Q: "𝗤", R: "𝗥", S: "𝗦", T: "𝗧",
-        U: "𝗨", V: "𝗩", W: "𝗪", X: "𝗫", Y: "𝗬", Z: "𝗭",
-        a: "𝗮", b: "𝗯", c: "𝗰", d: "𝗱", e: "𝗲", f: "𝗳", g: "𝗴", h: "𝗵", i: "𝗶", j: "𝗷",
-        k: "𝗸", l: "𝗹", m: "𝗺", n: "𝗻", o: "𝗼", p: "𝗽", q: "𝗾", r: "𝗿", s: "𝘀", t: "𝘁",
-        u: "𝘂", v: "𝘃", w: "𝘄", x: "𝘅", y: "𝘆", z: "𝘇"
-      };
+      await api.addUserToGroup(leftID, threadID);
 
-      const boldName = userName.split("").map(c => boldMap[c] || c).join("");
+      const imagePath = path.join(__dirname, "leave.png");
 
-      const form = {
-        body: `😹 ${boldName} tried to leave...  
+      const body = `╭───────✦🤣✦───────╮
+       🚨 পালানোর চেষ্টা! 🚨
+╰───────✦🤣✦───────╯
 
-🚫 Not allowed here!  
-🔄 Added back 😇`
-      };
+🤣 আরে আরে! ${userName} আমাদের গ্রুপ ছেড়ে পালাতে চাচ্ছিল! কেন রে কেন? 😂
 
-      try {
-        await api.addUserToGroup(leftID, threadID);
-        await message.send(form);
-      } catch (err) {}
+🏃‍♂️ ভাবছিলি পালিয়ে বাঁচবি? হায়রে কপাল! 🤣
+
+🚨 পালানোর চেষ্টা করে কোনো লাভ নাই, শেষ পর্যন্ত ধরা খেয়ে গেছিস! 😜
+
+🤭 আমাদের ফ্যামিলি থেকে ছেড়ে যাওয়ার এত শখ কেন তোর?
+
+🔄 তোকে আবার ধরে নিয়ে আসা হলো! 😂 এবার পালানোর চিন্তা বাদ দিয়ে চুপচাপ সবার সাথে আড্ডা মার!
+
+👑 মনে রাখিস, এই গ্রুপে ঢোকা সহজ, কিন্তু বের হওয়া ভীষণ কঠিন! 🤣
+
+❤️ পালানোর চিন্তা বাদ, এবার হাসিমুখে সবার সাথে আড্ডা চালিয়ে যা! 😂
+
+╭───────✦👑✦───────╮
+❤️ ${groupName} ❤️
+╰───────✦🤣✦───────╯`;
+
+      if (fs.existsSync(imagePath)) {
+        await api.sendMessage({
+          body,
+          attachment: fs.createReadStream(imagePath)
+        }, threadID);
+      } else {
+        await api.sendMessage(body, threadID);
+      }
+
+    } catch (err) {
+      console.log("AntiLeave Error:", err);
     }
   }
 };
