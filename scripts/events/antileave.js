@@ -5,7 +5,7 @@ const { createCanvas, loadImage } = require("canvas");
 module.exports = {
   config: {
     name: "antileave",
-    version: "4.0",
+    version: "5.0",
     author: "Shorif Ullah",
     category: "events"
   },
@@ -24,10 +24,8 @@ module.exports = {
       const userName = await usersData.getName(leftID);
       const threadInfo = await api.getThreadInfo(threadID);
 
-      const groupName =
-        threadInfo.threadName || "আমাদের ফ্যামিলি";
+      const groupName = threadInfo.threadName || "আমাদের ফ্যামিলি";
 
-      // Original Image
       const imagePath = path.join(
         __dirname,
         "file_000000009554821180b5c5fdd88de632.png"
@@ -38,76 +36,79 @@ module.exports = {
         return;
       }
 
-      // Load Image
       const image = await loadImage(imagePath);
 
       const canvas = createCanvas(image.width, image.height);
       const ctx = canvas.getContext("2d");
 
+      const sx = image.width / 1170;
+      const sy = image.height / 1280;
+
       ctx.drawImage(image, 0, 0);
 
-      // Name Position
-      ctx.fillStyle = "#050009";
-      ctx.fillRect(525, 310, 205, 68);
-
-      ctx.font = "bold 48px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      let name = userName;
-      let fontSize = 48;
-
-      while (
-        ctx.measureText(name).width > 190 &&
-        fontSize > 20
-      ) {
-        fontSize -= 2;
-        ctx.font = `bold ${fontSize}px sans-serif`;
-      }
-
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = "#000000";
-      ctx.strokeText(name, 625, 345);
-
-      ctx.fillStyle = "#FFFF00";
-      ctx.fillText(name, 625, 345);
-
-      // Group Name Position
+      // MEMBER NAME
       ctx.fillStyle = "#080008";
-      ctx.fillRect(580, 1405, 315, 55);
-
-      let groupFont = 46;
-      ctx.font = `bold ${groupFont}px sans-serif`;
-
-      while (
-        ctx.measureText(groupName).width > 290 &&
-        groupFont > 18
-      ) {
-        groupFont -= 2;
-        ctx.font = `bold ${groupFont}px sans-serif`;
-      }
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = "#000000";
-      ctx.strokeText(groupName, 738, 1432);
-
-      ctx.fillStyle = "#FFFF00";
-      ctx.fillText(groupName, 738, 1432);
-
-      // Save Generated Image
-      outputPath = path.join(
-        __dirname,
-        `leave_${threadID}_${Date.now()}.png`
+      ctx.fillRect(
+        435 * sx,
+        263 * sy,
+        175 * sx,
+        49 * sy
       );
 
-      fs.writeFileSync(outputPath, canvas.toBuffer("image/png"));
+      let nameSize = 40 * sx;
 
-      // Add Member Again
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      do {
+        ctx.font = `bold ${nameSize}px sans-serif`;
+        if (ctx.measureText(userName).width <= 165 * sx) break;
+        nameSize -= 2 * sx;
+      } while (nameSize > 12 * sx);
+
+      ctx.fillStyle = "#FFFF00";
+      ctx.fillText(
+        userName,
+        522 * sx,
+        287 * sy
+      );
+
+      // GROUP NAME
+      ctx.fillStyle = "#080008";
+      ctx.fillRect(
+        460 * sx,
+        1173 * sy,
+        300 * sx,
+        55 * sy
+      );
+
+      let groupSize = 40 * sx;
+
+      do {
+        ctx.font = `bold ${groupSize}px sans-serif`;
+        if (ctx.measureText(groupName).width <= 285 * sx) break;
+        groupSize -= 2 * sx;
+      } while (groupSize > 12 * sx);
+
+      ctx.fillStyle = "#FFFF00";
+      ctx.fillText(
+        groupName,
+        610 * sx,
+        1200 * sy
+      );
+
+      outputPath = path.join(
+        __dirname,
+        `leave_${Date.now()}.png`
+      );
+
+      fs.writeFileSync(
+        outputPath,
+        canvas.toBuffer("image/png")
+      );
+
       await api.addUserToGroup(leftID, threadID);
 
-      // Send Only Image
       await api.sendMessage(
         {
           attachment: fs.createReadStream(outputPath)
