@@ -24,6 +24,7 @@ module.exports = {
 
       await api.addUserToGroup(leftID, threadID);
 
+      // Image location
       const imagePath = path.join(__dirname, "leave.png");
 
       const body = `╭───────✦🤣✦───────╮
